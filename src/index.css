@@ -1,0 +1,96 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Global base styles ───────────────────────────────────────────────── */
+@layer base {
+  :root {
+    /* Safe area insets for notched phones */
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-top:    env(safe-area-inset-top, 0px);
+  }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overscroll-behavior: none;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background-color: #F6F8FC;
+    color: #0F172A;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Tabular figures globally for all numeric values */
+    font-feature-settings: 'tnum' on, 'cv05' on;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Hide scrollbars globally */
+  ::-webkit-scrollbar { display: none; }
+  * { scrollbar-width: none; }
+
+  /* Focus ring — visible only for keyboard users */
+  :focus-visible {
+    outline: 2px solid #2563EB;
+    outline-offset: 2px;
+  }
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  #root {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+/* ── Component utilities ─────────────────────────────────────────────── */
+@layer components {
+  /* ── Touch-target enforcement (48px minimum) ── */
+  .touch-target {
+    min-height: 48px;
+    min-width: 48px;
+  }
+
+  /* ── Tabular numerics ── */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' on;
+  }
+
+  /* ── Card ── */
+  .card {
+    @apply bg-surface rounded-card border border-slate-200/80 shadow-card;
+  }
+
+  /* ── Safe-area padding utilities ── */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  /* ── Skeleton loading block ── */
+  .skeleton {
+    @apply bg-surface-high rounded animate-skeleton;
+  }
+
+  /* ── No-scrollbar horizontal scroll ── */
+  .scroll-x {
+    @apply overflow-x-auto;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scroll-x::-webkit-scrollbar { display: none; }
+
+  /* ── Active scale feedback ── */
+  .active\:scale-tap:active {
+    transform: scale(0.97);
+  }
+}
