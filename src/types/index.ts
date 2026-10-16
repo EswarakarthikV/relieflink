@@ -46,6 +46,8 @@ export interface Request {
   urgency: UrgencyLevel
   status: RequestStatus
   location: string
+  address_line?: string
+  city?: string
   coordinates?: { lat: number; lng: number }
   distanceKm?: number
   items: SupplyItem[]
@@ -57,6 +59,14 @@ export interface Request {
   expiresAt?: string
   disasterContext?: string   // e.g. "Chennai Flood Relief"
 }
+
+export interface RequestContact {
+  request_id: string
+  contact_name: string
+  contact_phone: string
+  contact_email?: string | null
+}
+
 
 export interface Offer {
   id: string

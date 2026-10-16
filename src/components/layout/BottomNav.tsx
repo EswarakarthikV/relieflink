@@ -3,18 +3,20 @@ import {
   Home,
   Compass,
   Plus,
+  ClipboardList,
   Bell,
   User,
 } from 'lucide-react'
 import { cn } from '@/utils/cn'
+import { useNotifications } from '@/hooks/useNotifications'
 
 // ── 5 tabs per spec override ──────────────────────────────────────────────
 const NAV_TABS = [
-  { to: '/home',    label: 'Home',    Icon: Home    },
-  { to: '/browse',  label: 'Browse',  Icon: Compass },
+  { to: '/home',        label: 'Home',        Icon: Home          },
+  { to: '/browse',      label: 'Browse',      Icon: Compass       },
   // Create is the centre FAB — handled specially below
-  { to: '/alerts',  label: 'Alerts',  Icon: Bell    },
-  { to: '/profile', label: 'Profile', Icon: User    },
+  { to: '/my-requests', label: 'My Requests', Icon: ClipboardList },
+  { to: '/alerts',      label: 'Alerts',      Icon: Bell          },
 ]
 
 interface BottomNavProps {
@@ -23,6 +25,7 @@ interface BottomNavProps {
 
 export function BottomNav({ onCreateClick }: BottomNavProps = {}) {
   const location = useLocation()
+  const { unreadCount } = useNotifications()
 
   return (
     <nav
@@ -95,7 +98,23 @@ export function BottomNav({ onCreateClick }: BottomNavProps = {}) {
           </span>
         </button>
 
-        {/* Tab 4: Alerts */}
+        {/* Tab 4: My Requests */}
+        <NavLink
+          to="/my-requests"
+          className={({ isActive }) =>
+            cn(
+              'flex flex-col items-center justify-center gap-0.5 min-h-touch min-w-[56px]',
+              'flex-1 rounded-input transition-colors',
+              isActive ? 'text-brand-600' : 'text-ink-muted hover:text-ink',
+            )
+          }
+          aria-label="My Requests"
+        >
+          <ClipboardList className="w-6 h-6" strokeWidth={location.pathname === '/my-requests' ? 2.5 : 1.75} />
+          <span className="text-label font-medium">Requests</span>
+        </NavLink>
+
+        {/* Tab 5: Alerts */}
         <NavLink
           to="/alerts"
           className={({ isActive }) =>
@@ -113,28 +132,12 @@ export function BottomNav({ onCreateClick }: BottomNavProps = {}) {
                 <Bell className="w-6 h-6" strokeWidth={isActive ? 2.5 : 1.75} />
                 {/* Unread badge */}
                 <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-danger text-white text-[9px] font-bold flex items-center justify-center leading-none">
-                  3
+                  {unreadCount}
                 </span>
               </div>
               <span className="text-label font-medium">Alerts</span>
             </>
           )}
-        </NavLink>
-
-        {/* Tab 5: Profile */}
-        <NavLink
-          to="/profile"
-          className={({ isActive }) =>
-            cn(
-              'flex flex-col items-center justify-center gap-0.5 min-h-touch min-w-[56px]',
-              'flex-1 rounded-input transition-colors',
-              isActive ? 'text-brand-600' : 'text-ink-muted hover:text-ink',
-            )
-          }
-          aria-label="Profile"
-        >
-          <User className="w-6 h-6" strokeWidth={location.pathname === '/profile' ? 2.5 : 1.75} />
-          <span className="text-label font-medium">Profile</span>
         </NavLink>
 
       </div>

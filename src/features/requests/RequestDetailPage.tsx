@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { MapPin, Clock, Users, AlertTriangle } from 'lucide-react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { MapPin, Clock, Users, AlertTriangle, ArrowLeft, Phone, Lock } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
 import { TopBar } from '@/components/layout/TopBar'
 import { UrgencyBadge, StatusBadge } from '@/components/ui/Badge'
@@ -8,13 +8,19 @@ import { StackedProgressBar } from '@/components/ui/ProgressBar'
 import { Button } from '@/components/ui/Button'
 import { PageSpinner } from '@/components/ui/Spinner'
 import { MakeOfferSheet } from '@/features/offers/MakeOfferSheet'
-import { useRequest } from '@/hooks/useRequests'
+import { useRequest, useRequestItemStats, useRequestContact } from '@/hooks/useRequests'
+import { useAuth } from '@/hooks/useAuth'
 import { relativeTime, fmtNumber, fmtPercent } from '@/utils/format'
 import { cn } from '@/utils/cn'
+import type { Request } from '@/types'
 
 export function RequestDetailPage() {
   const { id = '' }    = useParams<{ id: string }>()
+  const navigate       = useNavigate()
+  const { user }       = useAuth()
   const { data: req, isLoading, isError } = useRequest(id)
+  const { data: stats = [] } = useRequestItemStats(id)
+  const { data: contact } = useRequestContact(id)
   const [offerOpen, setOfferOpen] = useState(false)
 
   if (isLoading) return (
@@ -37,10 +43,46 @@ export function RequestDetailPage() {
     </AppShell>
   )
 
-  const totalCommitted = req.items.reduce((s, i) => s + i.quantityCommitted, 0)
-  const totalDelivered = req.items.reduce((s, i) => s + i.quantityDelivered, 0)
-  const totalRequested = req.items.reduce((s, i) => s + i.quantityRequested, 0)
-  const remaining = totalRequested - totalCommitted
+  const displayItems = stats.length > 0
+    ? stats.map(s => ({
+        id: s.request_item_id,
+        name: s.item_name,
+        unit: s.unit,
+        category: s.category,
+        quantity_needed: s.quantity_needed,
+        quantity_committed: s.quantity_committed,
+        quantity_delivered: s.quantity_delivered,
+        quantity_remaining: s.quantity_remaining,
+      }))
+    : req.items.map(i => ({
+        id: i.id,
+        name: i.name,
+        unit: i.unit,
+        category: i.category,
+        quantity_needed: i.quantityRequested,
+        quantity_committed: i.quantityCommitted,
+        quantity_delivered: i.quantityDelivered,
+        quantity_remaining: Math.max(0, i.quantityRequested - i.quantityCommitted),
+      }))
+
+  const totalCommitted = displayItems.reduce((s, i) => s + i.quantity_committed, 0)
+  const totalDelivered = displayItems.reduce((s, i) => s + i.quantity_delivered, 0)
+  const totalRequested = displayItems.reduce((s, i) => s + i.quantity_needed, 0)
+  const remaining = displayItems.reduce((s, i) => s + i.quantity_remaining, 0)
+
+  const updatedReq: Request = {
+    ...req,
+    items: req.items.map(item => {
+      const stat = stats.find(s => s.request_item_id === item.id)
+      if (!stat) return item
+      return {
+        ...item,
+        quantityRequested: stat.quantity_needed,
+        quantityCommitted: stat.quantity_committed,
+        quantityDelivered: stat.quantity_delivered,
+      }
+    }),
+  }
 
   return (
     <>
@@ -52,6 +94,15 @@ export function RequestDetailPage() {
         />
 
         <div className="pt-16 px-4 pb-6 space-y-4">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="inline-flex items-center gap-1.5 text-[13px] text-ink-muted hover:text-brand-600 transition-colors cursor-pointer select-none py-1 -ml-0.5"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to requests</span>
+          </button>
+
           {/* ── Header card ─────────────────────────────────────────── */}
           <div className="bg-surface rounded-card border border-slate-200/80 shadow-card p-4 space-y-3">
             <div className="flex items-start justify-between gap-2">
@@ -68,10 +119,45 @@ export function RequestDetailPage() {
               </div>
             )}
 
-            <div className="flex items-center gap-1.5 text-ink">
-              <MapPin className="w-4 h-4 text-brand-600 shrink-0" />
-              <span className="text-body font-medium">{req.location}</span>
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5 text-ink">
+                <MapPin className="w-4 h-4 text-brand-600 shrink-0" />
+                <span className="text-body font-medium">{req.location}</span>
+              </div>
+              <div>
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
+                    req.address_line
+                      ? (req.city ? `${req.address_line}, ${req.city}` : req.address_line)
+                      : (req.city || req.location || 'Pune')
+                  )}`}
+                  target="_blank"
+                  rel="noopener"
+                  className="text-[13px] text-ink-muted hover:text-brand-600 transition-colors inline-flex items-center gap-0.5"
+                >
+                  Get directions ↗
+                </a>
+              </div>
             </div>
+
+            {/* Item chips (first 2 + "+N more") */}
+            {req.items && req.items.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                {req.items.slice(0, 2).map(item => (
+                  <span
+                    key={item.id}
+                    className="text-caption px-2.5 py-1 rounded bg-surface-high text-on-surface-muted font-medium"
+                  >
+                    {item.category || item.name} · {fmtNumber(item.quantityRequested)} {item.unit}
+                  </span>
+                ))}
+                {req.items.length > 2 && (
+                  <span className="text-caption px-2.5 py-1 rounded bg-surface-high text-on-surface-muted font-medium">
+                    +{req.items.length - 2} more
+                  </span>
+                )}
+              </div>
+            )}
 
             <div className="flex items-center gap-4 text-caption text-ink-muted pt-1">
               <div className="flex items-center gap-1">
@@ -117,12 +203,52 @@ export function RequestDetailPage() {
             </div>
           </div>
 
+          {/* ── Contact Section ─────────────────────────────────────────── */}
+          <div className="bg-surface rounded-card border border-slate-200/80 shadow-card p-4 space-y-3">
+            <h2 className="text-h4 font-semibold text-ink">Contact</h2>
+
+            {contact ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-brand-100 flex items-center justify-center shrink-0">
+                    <Phone className="w-5 h-5 text-brand-600" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[13px] text-ink-muted uppercase font-semibold tracking-wider block">
+                      Contact on delivery
+                    </span>
+                    <p className="text-[16px] font-semibold text-navy-900 truncate">
+                      {contact.contact_name}
+                    </p>
+                    <p className="text-[14px] text-ink-muted">
+                      {contact.contact_phone}
+                    </p>
+                  </div>
+                </div>
+
+                <a
+                  href={`tel:${contact.contact_phone}`}
+                  className="w-full h-[44px] rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-medium text-body flex items-center justify-center gap-2 transition-colors active:scale-[0.99] shadow-sm select-none"
+                >
+                  <Phone className="w-4 h-4" />
+                  <span>Call {contact.contact_name}</span>
+                </a>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2.5 p-3 rounded-lg bg-slate-50 border border-slate-200/80 text-ink-muted text-caption">
+                <Lock className="w-4 h-4 shrink-0 text-ink-muted" />
+                <span>Contact details are visible to donors with active offers.</span>
+              </div>
+            )}
+          </div>
+
           {/* ── Items detail ─────────────────────────────────────────── */}
           <div className="bg-surface rounded-card border border-slate-200/80 shadow-card p-4 space-y-3">
             <h2 className="text-h4 font-semibold text-ink">Items Requested</h2>
+
             <div className="divide-y divide-slate-100">
-              {req.items.map(item => {
-                const pct = fmtPercent(item.quantityCommitted, item.quantityRequested)
+              {displayItems.map(item => {
+                const pct = fmtPercent(item.quantity_committed, item.quantity_needed)
                 return (
                   <div key={item.id} className="py-3 first:pt-0 last:pb-0 space-y-2">
                     <div className="flex items-center justify-between">
@@ -135,9 +261,11 @@ export function RequestDetailPage() {
                         style={{ width: pct }}
                       />
                     </div>
-                    <div className="flex items-center justify-between text-caption text-ink-muted tnum">
-                      <span>{fmtNumber(item.quantityCommitted)} committed</span>
-                      <span>{fmtNumber(item.quantityRequested - item.quantityCommitted)} remaining</span>
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-caption text-ink-muted tnum">
+                      <span>{fmtNumber(item.quantity_needed)} {item.unit} needed</span>
+                      <span>{fmtNumber(item.quantity_committed)} committed</span>
+                      <span>{fmtNumber(item.quantity_delivered)} delivered</span>
+                      <span>{fmtNumber(item.quantity_remaining)} remaining</span>
                     </div>
                   </div>
                 )
@@ -156,6 +284,17 @@ export function RequestDetailPage() {
             >
               Make an Offer
             </Button>
+            {user?.id && req.requesterId && user.id === req.requesterId && (
+              <Button
+                variant="secondary"
+                fullWidth
+                size="lg"
+                className="mt-2.5"
+                onClick={() => navigate(`/tracker/${req.id}`)}
+              >
+                Track this request →
+              </Button>
+            )}
             {remaining <= 0 && (
               <p className="text-caption text-success text-center mt-2 font-medium">
                 ✓ This request is fully committed!
@@ -168,7 +307,7 @@ export function RequestDetailPage() {
       {/* ── Make Offer Bottom Sheet ──────────────────────────────────── */}
       {req && (
         <MakeOfferSheet
-          request={req}
+          request={updatedReq}
           isOpen={offerOpen}
           onClose={() => setOfferOpen(false)}
         />

@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { Home, Compass, Plus, Bell, User } from 'lucide-react'
+import { Home, Compass, ClipboardList, Plus, User } from 'lucide-react'
 import { cn } from '@/utils/cn'
 
 interface SidebarProps {
@@ -82,6 +82,22 @@ export function Sidebar({ className, onCreateClick }: SidebarProps) {
             <span className="text-body font-medium">Browse</span>
           </NavLink>
 
+          {/* My Requests */}
+          <NavLink
+            to="/my-requests"
+            className={({ isActive }) =>
+              cn(
+                'flex items-center gap-3 px-3 h-[44px] rounded-pill text-body transition-colors relative',
+                isActive
+                  ? 'bg-brand-600 text-white font-semibold shadow-sm'
+                  : 'text-brand-100 hover:text-white hover:bg-white/10 font-medium',
+              )
+            }
+          >
+            <ClipboardList className="w-6 h-6 shrink-0" strokeWidth={2} />
+            <span className="text-body font-medium">My Requests</span>
+          </NavLink>
+
           {/* Create (triggers chooser modal) */}
           <button
             type="button"
@@ -97,25 +113,6 @@ export function Sidebar({ className, onCreateClick }: SidebarProps) {
             <Plus className="w-6 h-6 shrink-0" strokeWidth={2} />
             <span className="text-body font-medium">Create</span>
           </button>
-
-          {/* Alerts */}
-          <NavLink
-            to="/alerts"
-            className={({ isActive }) =>
-              cn(
-                'flex items-center gap-3 px-3 h-[44px] rounded-pill text-body transition-colors relative',
-                isActive
-                  ? 'bg-brand-600 text-white font-semibold shadow-sm'
-                  : 'text-brand-100 hover:text-white hover:bg-white/10 font-medium',
-              )
-            }
-          >
-            <Bell className="w-6 h-6 shrink-0" strokeWidth={2} />
-            <span className="text-body font-medium">Alerts</span>
-            <span className="ml-auto px-2 py-0.5 rounded-pill bg-danger text-white text-[11px] font-bold leading-tight">
-              3
-            </span>
-          </NavLink>
 
           {/* Profile */}
           <NavLink

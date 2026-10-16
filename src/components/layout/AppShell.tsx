@@ -1,7 +1,10 @@
 import { useState, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
+import { Bell } from 'lucide-react'
 import { BottomNav } from './BottomNav'
 import { Sidebar } from './Sidebar'
 import { CreateChooser } from '@/features/requests/CreateChooser'
+import { useNotifications } from '@/hooks/useNotifications'
 import { cn } from '@/utils/cn'
 
 interface AppShellProps {
@@ -19,9 +22,25 @@ interface AppShellProps {
  */
 export function AppShell({ children, hideNav = false, className }: AppShellProps) {
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const { unreadCount } = useNotifications()
 
   return (
     <div className="min-h-dvh bg-bg-app lg:[&_header]:hidden">
+      {/* Top-right notification bell icon */}
+      {!hideNav && (
+        <Link
+          to="/notifications"
+          aria-label={`Notifications (${unreadCount} unread)`}
+          className="fixed top-3.5 right-4 lg:top-6 lg:right-8 z-50 flex items-center justify-center p-1.5 rounded-full text-ink-muted hover:text-brand-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
+        >
+          <div className="relative flex items-center justify-center">
+            <Bell className="w-6 h-6" />
+            <span className="absolute -top-1 -right-1 px-1 min-w-[18px] h-[18px] rounded-full bg-danger text-white text-[10px] font-bold flex items-center justify-center leading-none shadow-sm">
+              {unreadCount}
+            </span>
+          </div>
+        </Link>
+      )}
       {/* Desktop fixed sidebar (>=1024px) */}
       <Sidebar
         className="hidden lg:flex"

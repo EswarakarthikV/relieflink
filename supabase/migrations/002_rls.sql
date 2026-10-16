@@ -134,7 +134,7 @@ CREATE POLICY "request_contacts_select" ON public.request_contacts
     OR request_id IN (
       SELECT request_id FROM public.offers
       WHERE donor_id = auth.uid()
-        AND status IN ('accepted', 'dispatched', 'delivered')
+        AND status IN ('pending', 'accepted', 'dispatched', 'delivered')
     )
   );
 

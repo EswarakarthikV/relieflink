@@ -8,6 +8,9 @@ import { AlertsPage }        from '@/features/notifications/AlertsPage'
 import { AdminDashboard }    from '@/features/admin/AdminDashboard'
 import { ProfilePage }       from '@/features/profile/ProfilePage'
 import { CreateDrivePage }   from '@/routes/CreateDrivePage'
+import { MyRequestsPage }    from '@/routes/MyRequestsPage'
+
+import { TrackerPage }       from '@/features/requests/TrackerPage'
 
 export const router = createBrowserRouter([
   // Root → redirect to home dashboard
@@ -17,15 +20,18 @@ export const router = createBrowserRouter([
   { path: '/login',    element: <LoginPage /> },
 
   // Main app tabs
-  { path: '/home',     element: <HomePage /> },
-  { path: '/browse',   element: <BrowsePage /> },
+  { path: '/home',        element: <HomePage /> },
+  { path: '/browse',      element: <BrowsePage /> },
+  { path: '/my-requests', element: <MyRequestsPage /> },
   { path: '/create',       element: <CreatePage /> },
   { path: '/create-drive', element: <CreateDrivePage /> },
-  { path: '/alerts',   element: <AlertsPage /> },
-  { path: '/profile',  element: <ProfilePage /> },
+  { path: '/alerts',        element: <AlertsPage /> },
+  { path: '/notifications', element: <AlertsPage /> },
+  { path: '/profile',       element: <ProfilePage /> },
 
   // Detail screens
   { path: '/requests/:id', element: <RequestDetailPage /> },
+  { path: '/tracker/:id',  element: <TrackerPage /> },
 
   // Admin
   { path: '/admin',    element: <AdminDashboard /> },

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Bell, AlertTriangle, ChevronRight, MapPin, Package, CheckCircle, ClipboardList } from 'lucide-react'
+import { AlertTriangle, ChevronRight, MapPin, Package, CheckCircle, ClipboardList } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
 import { UrgencyBadge } from '@/components/ui/Badge'
 import { ProgressBar } from '@/components/ui/ProgressBar'
@@ -92,10 +92,10 @@ export function HomePage() {
 
   return (
     <AppShell>
-      {/* ── App bar (navy) ─────────────────────────────────────────── */}
-      <div className="bg-navy-900 px-4 py-3 flex items-center justify-between rounded-xl mx-4 mt-4 shadow-card">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-input bg-brand-600 flex items-center justify-center">
+      {/* ── TopBar (full-width navy with 16px bottom rounded corners) ─── */}
+      <div className="bg-navy-900 w-[calc(100%+2rem)] -mx-4 -mt-safe lg:w-[calc(100%+4rem)] lg:-mx-8 lg:-mt-8 rounded-t-none rounded-b-[16px] px-6 py-4 flex items-center justify-start shadow-md mb-2">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-input bg-brand-600 flex items-center justify-center text-white shrink-0">
             <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
               <path d="M12 5v6" /><path d="M9 8h6" />
@@ -103,10 +103,6 @@ export function HomePage() {
           </div>
           <span className="text-h4 font-bold text-white tracking-tight">ReliefLink</span>
         </div>
-        <Link to="/alerts" className="relative min-h-touch min-w-[48px] flex items-center justify-center">
-          <Bell className="w-6 h-6 text-white" />
-          <span className="absolute top-2 right-2 w-4 h-4 rounded-full bg-danger text-white text-[9px] font-bold flex items-center justify-center">3</span>
-        </Link>
       </div>
 
       {/* ── Greeting ───────────────────────────────────────────────── */}
