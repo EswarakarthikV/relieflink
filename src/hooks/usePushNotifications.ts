@@ -8,6 +8,7 @@ import {
   savePushSubscription,
   removePushSubscription,
   triggerLocalTestNotification,
+  triggerRemotePush,
   VAPID_PUBLIC_KEY,
 } from '@/lib/pushNotifications'
 import { useAuth } from './useAuth'
@@ -211,7 +212,23 @@ export function usePushNotifications(): UsePushNotificationsResult {
     body?: string,
   ): Promise<boolean> => {
     try {
-      return await triggerLocalTestNotification(title, body)
+      const testTitle = title || 'ReliefLink Alert · High Urgency'
+      const testBody = body || 'Drinking water consignment dispatched for 200 families. Real-time push verified!'
+
+      // Attempt remote push via serverless /api/notify endpoint
+      const remoteRes = await triggerRemotePush({
+        event: 'test',
+        recipientUserId: user?.id || null,
+        title: testTitle,
+        body: testBody,
+        url: '/alerts',
+        tag: 'relieflink-test-alert',
+        idempotencyKey: `test-${Date.now()}`,
+      }).catch(() => ({ success: false }))
+
+      // Also trigger local service worker notification for immediate feedback
+      const localSuccess = await triggerLocalTestNotification(testTitle, testBody)
+      return Boolean(remoteRes?.success || localSuccess)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
       console.error('[ReliefLink Push] Test notification error:', msg)

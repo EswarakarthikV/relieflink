@@ -13,6 +13,7 @@ import { useOffers, updateMockOfferStatus, type TrackerOffer } from '@/hooks/use
 import { useAuth } from '@/hooks/useAuth'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import { queryClient } from '@/lib/queryClient'
+import { triggerRemotePush } from '@/lib/pushNotifications'
 import { fmtNumber, relativeTime } from '@/utils/format'
 import { cn } from '@/utils/cn'
 
@@ -98,6 +99,18 @@ export function TrackerPage() {
       dispatched_at: new Date().toISOString(),
     })
 
+    if (req?.requesterId) {
+      triggerRemotePush({
+        event: 'offer_dispatched',
+        recipientUserId: req.requesterId,
+        title: 'Consignment Dispatched',
+        body: `Supplies for "${req.title || 'Relief Request'}" have been dispatched and are on the way!`,
+        url: `/requests/${req.id || id}`,
+        tag: `relieflink-dispatch-${offer.id}`,
+        idempotencyKey: `client-dispatch-${offer.id}`,
+      }).catch(() => {})
+    }
+
     await refetchAll()
     setLoadingOfferId(null)
     setLoadingAction(null)
@@ -129,6 +142,18 @@ export function TrackerPage() {
     }
 
     updateMockOfferStatus(offer.id, 'cancelled')
+
+    if (req?.requesterId) {
+      triggerRemotePush({
+        event: 'offer_cancelled',
+        recipientUserId: req.requesterId,
+        title: 'Offer Cancelled',
+        body: `A donor cancelled their offer for "${req?.title || 'Relief Request'}".`,
+        url: `/requests/${req?.id || id}`,
+        tag: `relieflink-cancelled-${offer.id}`,
+        idempotencyKey: `client-cancelled-${offer.id}`,
+      }).catch(() => {})
+    }
 
     await refetchAll()
     setLoadingOfferId(null)
@@ -162,6 +187,18 @@ export function TrackerPage() {
     }
 
     updateMockOfferStatus(offer.id, 'cancelled')
+
+    if (offer.donor_id) {
+      triggerRemotePush({
+        event: 'offer_rejected',
+        recipientUserId: offer.donor_id,
+        title: 'Offer Removed',
+        body: `Your offer for "${req?.title || 'Relief Request'}" was removed by the coordinator.`,
+        url: `/requests/${req?.id || id}`,
+        tag: `relieflink-rejected-${offer.id}`,
+        idempotencyKey: `client-rejected-${offer.id}`,
+      }).catch(() => {})
+    }
 
     await refetchAll()
     setLoadingOfferId(null)
@@ -197,6 +234,18 @@ export function TrackerPage() {
       quantity_delivered: qty,
       delivered_at: new Date().toISOString(),
     })
+
+    if (offer.donor_id) {
+      triggerRemotePush({
+        event: 'offer_delivered',
+        recipientUserId: offer.donor_id,
+        title: 'Delivery Confirmed',
+        body: `Your offer for "${req?.title || 'Relief Request'}" was received and verified. Thank you!`,
+        url: `/requests/${req?.id || id}`,
+        tag: `relieflink-delivered-${offer.id}`,
+        idempotencyKey: `client-delivered-${offer.id}`,
+      }).catch(() => {})
+    }
 
     await refetchAll()
     setLoadingOfferId(null)

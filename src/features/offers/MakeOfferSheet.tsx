@@ -11,6 +11,7 @@ import { cn } from '@/utils/cn'
 import type { Request, DeliveryMethod, SupplyItem } from '@/types'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import { queryClient } from '@/lib/queryClient'
+import { triggerRemotePush } from '@/lib/pushNotifications'
 
 interface MakeOfferSheetProps {
   request: Request
@@ -207,6 +208,19 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
       queryClient.invalidateQueries({ queryKey: ['request_item_stats'] })
       queryClient.invalidateQueries({ queryKey: ['request', request.id] })
       queryClient.invalidateQueries({ queryKey: ['requests'] })
+
+      // Dispatch real-time push notification to the requester
+      if (request.requesterId) {
+        triggerRemotePush({
+          event: 'offer_created',
+          recipientUserId: request.requesterId,
+          title: 'New Supply Offer Received',
+          body: `A donor offered ${qty} ${selectedItem.unit} of "${selectedItem.name}" for "${request.title}".`,
+          url: `/requests/${request.id}`,
+          tag: `relieflink-offer-${request.id}`,
+          idempotencyKey: `client-offer-${request.id}-${selectedItem.id}-${qty}`,
+        }).catch(() => {})
+      }
 
       setSubmitted(true)
     } catch (err: any) {

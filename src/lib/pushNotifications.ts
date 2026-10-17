@@ -191,3 +191,56 @@ export async function triggerLocalTestNotification(
     return false
   }
 }
+
+export interface RemotePushParams {
+  event?: 'critical_request' | 'offer_created' | 'offer_accepted' | 'offer_dispatched' | 'offer_delivered' | 'offer_rejected' | 'offer_cancelled' | 'test' | 'broadcast' | 'direct'
+  recipientUserId?: string | null
+  title: string
+  body: string
+  url?: string
+  tag?: string
+  idempotencyKey?: string
+}
+
+/**
+ * Dispatches a remote Web Push notification via the server-side /api/notify endpoint.
+ * This runs asynchronously and isolated: any delivery issue or offline state will NOT disrupt client transactions.
+ */
+export async function triggerRemotePush(params: RemotePushParams): Promise<{ success: boolean; duplicate?: boolean; error?: string }> {
+  try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    }
+
+    if (isSupabaseConfigured) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`
+        }
+      } catch {
+        // ignore session retrieval issues
+      }
+    }
+
+    const res = await fetch('/api/notify', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(params),
+    })
+
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}))
+      console.warn('[ReliefLink Push] Remote push dispatch non-ok status:', res.status, errJson)
+      return { success: false, error: errJson.error || `HTTP ${res.status}` }
+    }
+
+    const data = await res.json().catch(() => ({}))
+    return { success: true, duplicate: data.duplicate }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.warn('[ReliefLink Push] Remote push dispatch network exception (non-fatal):', msg)
+    return { success: false, error: msg }
+  }
+}
+

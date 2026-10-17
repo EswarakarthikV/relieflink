@@ -30,19 +30,19 @@ CREATE POLICY "Allow select own push subscriptions"
   ON public.push_subscriptions
   FOR SELECT
   USING (
-    auth.uid() IS NULL OR user_id IS NULL OR user_id = auth.uid()
+    user_id IS NOT NULL AND user_id = auth.uid()
   );
 
 CREATE POLICY "Allow update own push subscriptions"
   ON public.push_subscriptions
   FOR UPDATE
   USING (
-    auth.uid() IS NULL OR user_id IS NULL OR user_id = auth.uid()
+    user_id IS NOT NULL AND user_id = auth.uid()
   );
 
 CREATE POLICY "Allow delete own push subscriptions"
   ON public.push_subscriptions
   FOR DELETE
   USING (
-    auth.uid() IS NULL OR user_id IS NULL OR user_id = auth.uid()
+    user_id IS NOT NULL AND user_id = auth.uid()
   );

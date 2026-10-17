@@ -1,19 +1,41 @@
+import fs from 'fs'
 import { createClient } from '@supabase/supabase-js'
 
-const SUPABASE_URL = 'https://diogvbomcoaotobyvyhi.supabase.co'
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpb2d2Ym9tY29hb3RvYnl2eWhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwNzUwOTUsImV4cCI6MjEwNzY1MTA5NX0.vpDM0VxefEH1v6vHSrHqnETYnDRrBwLuJAJTDKUiTsk'
+let supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL
+let supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+if ((!supabaseUrl || !supabaseAnonKey) && fs.existsSync('.env.local')) {
+  const content = fs.readFileSync('.env.local', 'utf8')
+  for (const line of content.split('\n')) {
+    const trimmed = line.trim()
+    if (trimmed.startsWith('VITE_SUPABASE_URL=')) {
+      supabaseUrl = trimmed.substring('VITE_SUPABASE_URL='.length).trim()
+    } else if (trimmed.startsWith('VITE_SUPABASE_ANON_KEY=')) {
+      supabaseAnonKey = trimmed.substring('VITE_SUPABASE_ANON_KEY='.length).trim()
+    }
+  }
+}
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.log('Supabase configuration missing in environment or .env.local')
+  process.exit(0)
+}
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: { persistSession: false }
 })
 
 async function test() {
   const { data: authData, error: authErr } = await supabase.auth.signInAnonymously()
-  console.log('Anon user:', authData.user?.id)
+  if (authErr) {
+    console.log('Anon auth error:', authErr)
+    return
+  }
+  console.log('Anon user created:', Boolean(authData.user?.id))
 
   // Check if profile exists for this new anon user
   const { data: profile, error: profErr } = await supabase.from('profiles').select('*').eq('id', authData.user.id).maybeSingle()
-  console.log('Profile for anon user:', { profile, profErr })
+  console.log('Profile query result:', { hasProfile: Boolean(profile), profErr })
 
   // Try insert into requests
   const { data: req, error: reqErr } = await supabase.from('requests').insert([{
@@ -25,7 +47,7 @@ async function test() {
     address_line: 'Kothrud, Pune'
   }]).select('id').single()
 
-  console.log('Request insert result:', { req, reqErr })
+  console.log('Request insert result:', { hasReq: Boolean(req?.id), reqErr })
 }
 
 test().catch(console.error)

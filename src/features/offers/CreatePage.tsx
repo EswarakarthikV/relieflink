@@ -15,6 +15,7 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import { queryClient } from '@/lib/queryClient'
 import { LocationPickerModal, reverseGeocodeNominatim } from '@/components/LocationPickerModal'
 import { Toast } from '@/components/ui/Toast'
+import { triggerRemotePush } from '@/lib/pushNotifications'
 
 const URGENCY_OPTIONS: UrgencyLevel[] = ['low', 'medium', 'high', 'critical']
 const UNIT_OPTIONS = ['bottles', 'kg', 'kits', 'liters', 'packets', 'units']
@@ -301,6 +302,22 @@ export function CreatePage() {
         queryClient.invalidateQueries({ queryKey: ['requests'] })
         queryClient.invalidateQueries({ queryKey: ['my_requests'] })
         queryClient.invalidateQueries({ queryKey: ['request_contact'] })
+
+        // Automatically dispatch push alert to subscribers if high or critical urgency
+        if (createdRequestId && (form.urgency === 'critical' || form.urgency === 'high')) {
+          triggerRemotePush({
+            event: 'critical_request',
+            recipientUserId: null,
+            title: form.urgency === 'critical'
+              ? `🚨 Critical Relief Needed: ${form.location.trim() || 'Emergency Area'}`
+              : `⚠️ Urgent Relief Needed: ${form.location.trim() || 'Emergency Area'}`,
+            body: form.title.trim(),
+            url: `/requests/${createdRequestId}`,
+            tag: `relieflink-request-${createdRequestId}`,
+            idempotencyKey: `client-req-${createdRequestId}`,
+          }).catch(() => {})
+        }
+
         setSubmitted(true)
     } catch (err: any) {
       setSubmitError(err?.message || 'Failed to submit request. Please try again.')
