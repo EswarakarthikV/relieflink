@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
-import { X, Minus, Plus, Info, CheckCircle, AlertTriangle, Sparkles } from 'lucide-react'
+import { X, Minus, Plus, Info, CheckCircle, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
-import { Modal } from '@/components/ui/Modal'
 import { Toast } from '@/components/ui/Toast'
 import { Textarea } from '@/components/ui/Input'
 import { useCreateOffer, useRequestItemStats } from '@/hooks/useRequests'
@@ -12,7 +11,6 @@ import { cn } from '@/utils/cn'
 import type { Request, DeliveryMethod, SupplyItem } from '@/types'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import { queryClient } from '@/lib/queryClient'
-import { matchItemToRequest, type ItemMatchResult } from '@/lib/gemini'
 
 interface MakeOfferSheetProps {
   request: Request
@@ -23,7 +21,6 @@ interface MakeOfferSheetProps {
 const DELIVERY_OPTIONS: { value: DeliveryMethod; label: string; sub: string }[] = [
   { value: 'self',    label: 'I will deliver myself',       sub: 'Drop directly at the aid station' },
   { value: 'courier', label: 'I will ship via courier',     sub: 'Provide tracking details post submission' },
-  { value: 'pickup',  label: 'Requester picks up from me',  sub: 'Available for pickup within city limits' },
 ]
 
 export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps) {
@@ -58,12 +55,6 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [qtyError, setQtyError] = useState('')
   const [submitError, setSubmitError] = useState<string | null>(null)
-
-  // AI Item Matching states
-  const [donorItemText, setDonorItemText] = useState('')
-  const [isCheckingMatch, setIsCheckingMatch] = useState(false)
-  const [matchResult, setMatchResult] = useState<ItemMatchResult | null>(null)
-  const [isMatchModalOpen, setIsMatchModalOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [toastVariant, setToastVariant] = useState<'success' | 'warning' | 'danger'>('warning')
 
@@ -91,10 +82,6 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
       setQtyError('')
       setSubmitError(null)
       setOverrideRemaining({})
-      setDonorItemText('')
-      setIsCheckingMatch(false)
-      setMatchResult(null)
-      setIsMatchModalOpen(false)
       setToastMessage(null)
 
       // 1. FORCE REFETCH WHEN MODAL OPENS
@@ -104,24 +91,32 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
       ])
         .then(async () => {
           const { data: freshStats } = await refetchStats()
-          if (first && freshStats) {
-            const stat = freshStats.find(s => s.request_item_id === first.id)
-            if (stat) {
-              const freshMax = stat.quantity_remaining
-              setQty(freshMax > 0 ? Math.min(20, freshMax) : 0)
-            }
+          const targetItem =
+            (freshStats &&
+              request.items.find(it => {
+                const s = freshStats.find((st: any) => st.request_item_id === it.id)
+                return s && s.quantity_remaining > 0
+              })) ||
+            request.items.find(it => (it.quantityRequested - it.quantityCommitted) > 0) ||
+            request.items[0]
+
+          if (targetItem) {
+            setSelectedItem(targetItem)
+            const stat = freshStats?.find((s: any) => s.request_item_id === targetItem.id)
+            const freshMax = stat
+              ? stat.quantity_remaining
+              : Math.max(0, targetItem.quantityRequested - targetItem.quantityCommitted)
+            setQty(freshMax > 0 ? Math.min(20, freshMax) : 0)
           }
         })
         .finally(() => {
           setIsRefetchingStats(false)
         })
     }
-  }, [isOpen, request.id, refetchStats])
+  }, [isOpen, request.id, refetchStats, request.items])
 
   const handleSelectItem = (item: SupplyItem) => {
     setSelectedItem(item)
-    setMatchResult(null)
-    setIsMatchModalOpen(false)
     const itemStat = stats.find(s => s.request_item_id === item.id)
     const remaining = overrideRemaining[item.id] !== undefined
       ? overrideRemaining[item.id]
@@ -133,58 +128,6 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
     setQty(defaultQty)
     setQtyError('')
     setSubmitError(null)
-  }
-
-  // AI Item Match handler
-  const handleCheckMatch = async () => {
-    const trimmed = donorItemText.trim()
-    if (!trimmed) {
-      showToast('Could not confidently match this. Keep typing.', 'warning')
-      return
-    }
-    if (!selectedItem) {
-      showToast('Could not confidently match this. Keep typing.', 'warning')
-      return
-    }
-
-    setIsCheckingMatch(true)
-    const requestItemName = selectedStat?.item_name || selectedItem.name
-    const remainingQty = selectedStat?.quantity_remaining !== undefined
-      ? selectedStat.quantity_remaining
-      : maxQty
-
-    try {
-      const result = await matchItemToRequest(trimmed, requestItemName, remainingQty)
-      setMatchResult(result)
-
-      if (result.confidence > 0.5) {
-        setIsMatchModalOpen(true)
-      } else {
-        showToast('Could not confidently match this. Keep typing.', 'warning')
-      }
-    } catch (err: any) {
-      console.warn('Error checking item match:', err)
-      showToast('Could not confidently match this. Keep typing.', 'warning')
-    } finally {
-      setIsCheckingMatch(false)
-    }
-  }
-
-  const handleUseMatchQuantity = () => {
-    if (matchResult) {
-      if (typeof matchResult.converted_quantity === 'number' && matchResult.converted_quantity > 0) {
-        setQty(matchResult.converted_quantity)
-      } else {
-        const target = maxQty > 0 ? Math.min(20, maxQty) : 1
-        setQty(target)
-      }
-      setQtyError('')
-
-      if (donorItemText.trim() && !message) {
-        setMessage(`Offering: ${donorItemText.trim()}`)
-      }
-    }
-    setIsMatchModalOpen(false)
   }
 
   const changeQty = (delta: number) => {
@@ -460,38 +403,6 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
                 </div>
               )}
 
-              {/* ── 2b. Item name & AI Check Match ─────────────────── */}
-              <div className="flex flex-col gap-1.5 bg-surface border border-slate-200 rounded-card p-3.5 shadow-sm">
-                <label htmlFor="donor-item-name" className="text-caption font-semibold text-ink">
-                  What exactly are you providing? (Optional)
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    id="donor-item-name"
-                    type="text"
-                    value={donorItemText}
-                    onChange={e => setDonorItemText(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        handleCheckMatch()
-                      }
-                    }}
-                    placeholder="e.g. 15 crates of Bisleri"
-                    className="flex-1 h-11 rounded-input bg-surface-low border border-slate-300 px-3.5 text-body text-ink placeholder:text-ink-muted focus:outline-none focus:bg-surface focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20 transition-all"
-                  />
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    isLoading={isCheckingMatch}
-                    disabled={!donorItemText.trim() || isCheckingMatch}
-                    onClick={handleCheckMatch}
-                    className="h-11 px-3.5 shrink-0 border border-slate-300 text-brand-600 hover:text-brand-700 hover:bg-brand-100/40 hover:border-brand-600 font-semibold text-caption active:scale-[0.98] transition-all"
-                  >
-                    ✨ Check match
-                  </Button>
-                </div>
-              </div>
 
               {/* ── 3. Quantity stepper ──────────────────────────────── */}
               <div className="flex flex-col gap-2">
@@ -674,99 +585,6 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
 
       </div>
 
-      {/* ── Item Match Modal ───────────────────────────────────────── */}
-      <Modal
-        isOpen={isMatchModalOpen}
-        onClose={() => setIsMatchModalOpen(false)}
-        title="Match found"
-        maxWidth="max-w-md"
-      >
-        {matchResult && (
-          <div className="flex flex-col gap-4">
-            {/* Comparison Details: Donor text vs Request item */}
-            <Card as="div" noPadding className="p-3.5 bg-slate-50 border border-slate-200 rounded-card flex flex-col gap-2.5">
-              <div className="flex flex-col">
-                <span className="text-[11px] font-semibold uppercase text-ink-muted tracking-wider">
-                  Requester needs
-                </span>
-                <span className="text-body font-bold text-navy-900">
-                  {selectedItem?.name} ({maxQty} {selectedItem?.unit} remaining)
-                </span>
-              </div>
-              <div className="h-px bg-slate-200" />
-              <div className="flex flex-col">
-                <span className="text-[11px] font-semibold uppercase text-ink-muted tracking-wider">
-                  Donor offers
-                </span>
-                <span className="text-body font-semibold text-brand-600">
-                  {donorItemText}
-                </span>
-              </div>
-            </Card>
-
-            {/* Confidence bar: green > 0.8, amber > 0.6, red < 0.6 */}
-            {(() => {
-              const conf = matchResult.confidence
-              const confPercent = Math.round(conf * 100)
-              const confBarColor = conf > 0.8 ? 'bg-success' : conf > 0.6 ? 'bg-warning' : 'bg-danger'
-              const confTextColor = conf > 0.8 ? 'text-success' : conf > 0.6 ? 'text-warning' : 'text-danger'
-
-              return (
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between text-caption">
-                    <span className="font-semibold text-ink">Match confidence</span>
-                    <span className={cn('font-bold', confTextColor)}>{confPercent}%</span>
-                  </div>
-                  <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
-                    <div
-                      className={cn('h-full rounded-full transition-all duration-300', confBarColor)}
-                      style={{ width: `${Math.min(100, Math.max(0, confPercent))}%` }}
-                    />
-                  </div>
-                </div>
-              )
-            })()}
-
-            {/* Match Reasoning */}
-            <div className="flex flex-col gap-1">
-              <span className="text-caption font-semibold text-ink">Reasoning</span>
-              <p className="text-caption text-ink bg-surface-low border border-slate-200 p-3 rounded-input leading-relaxed">
-                {matchResult.reasoning}
-              </p>
-            </div>
-
-            {/* Converted quantity (if exists) */}
-            {matchResult.converted_quantity !== null && (
-              <div className="flex items-center justify-between p-3 rounded-input bg-brand-100/40 border border-brand-200 text-caption">
-                <span className="font-medium text-navy-900">Converted quantity:</span>
-                <span className="font-bold text-brand-700 text-body">
-                  {donorItemText} = {matchResult.converted_quantity} {selectedItem?.unit ?? 'units'}
-                </span>
-              </div>
-            )}
-
-            {/* Action buttons: Keep my entry & Use this quantity */}
-            <div className="flex items-center gap-3 pt-2">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => setIsMatchModalOpen(false)}
-                className="flex-1"
-              >
-                Keep my entry
-              </Button>
-              <Button
-                type="button"
-                variant="primary"
-                onClick={handleUseMatchQuantity}
-                className="flex-1 bg-brand-600 hover:bg-brand-700 text-white font-medium shadow-sm"
-              >
-                Use this quantity
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
 
       {/* Toast notification */}
       <Toast

@@ -6,6 +6,7 @@ import { Package, CheckCircle, Truck, AlertTriangle } from 'lucide-react'
 import { relativeTime } from '@/utils/format'
 import { cn } from '@/utils/cn'
 import { useNotifications, setMockNotificationsRead } from '@/hooks/useNotifications'
+import { PushNotificationSettings } from '@/components/notifications/PushNotificationSettings'
 import { queryClient } from '@/lib/queryClient'
 import { supabase } from '@/lib/supabase'
 
@@ -51,10 +52,15 @@ export function AlertsPage() {
         variant="navy"
       />
 
-      <div className="pt-16">
+      <div className="pt-16 max-w-lg mx-auto">
+        {/* Push Notification Controls */}
+        <div className="px-4 pt-4 pb-2">
+          <PushNotificationSettings />
+        </div>
+
         {/* Header row */}
         <div className="px-4 pt-4 pb-2 flex items-center justify-between">
-          <h2 className="text-h4 font-semibold text-ink">Notifications</h2>
+          <h2 className="text-h4 font-semibold text-ink">Recent Activity</h2>
           <button
             type="button"
             onClick={handleMarkAllRead}

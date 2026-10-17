@@ -126,11 +126,16 @@ export function RequestDetailPage() {
               </div>
               <div>
                 <a
-                  href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
-                    req.address_line
-                      ? (req.city ? `${req.address_line}, ${req.city}` : req.address_line)
-                      : (req.city || req.location || 'Pune')
-                  )}`}
+                  href={
+                    (req.latitude != null && req.longitude != null) ||
+                    (req.coordinates?.lat != null && req.coordinates?.lng != null)
+                      ? `https://www.google.com/maps/dir/?api=1&destination=${req.latitude ?? req.coordinates?.lat},${req.longitude ?? req.coordinates?.lng}`
+                      : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
+                          req.address_line && req.city
+                            ? `${req.address_line}, ${req.city}`
+                            : req.address_line || req.city || req.location || 'Pune'
+                        )}`
+                  }
                   target="_blank"
                   rel="noopener"
                   className="text-[13px] text-ink-muted hover:text-brand-600 transition-colors inline-flex items-center gap-0.5"

@@ -56,7 +56,7 @@ export function RequestCard({ request, className, trackLink }: RequestCardProps)
               key={item.id}
               className="text-caption px-2.5 py-1 rounded bg-surface-high text-on-surface-muted font-medium"
             >
-              {item.category || item.name} · {fmtNumber(item.quantityRequested)} {item.unit}
+              {item.name || item.category} · {fmtNumber(item.quantityRequested)} {item.unit}
             </span>
           ))}
           {request.items.length > 2 && (

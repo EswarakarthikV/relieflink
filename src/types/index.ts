@@ -26,6 +26,7 @@ export interface User {
   avatarInitials: string
   location?: string
   createdAt: string
+  is_anonymous?: boolean
 }
 
 export interface SupplyItem {
@@ -49,6 +50,8 @@ export interface Request {
   address_line?: string
   city?: string
   coordinates?: { lat: number; lng: number }
+  latitude?: number | null
+  longitude?: number | null
   distanceKm?: number
   items: SupplyItem[]
   requesterId: string
@@ -115,4 +118,27 @@ export interface RequestFilters {
   maxDistanceKm?: number
   search?: string
   sortBy?: 'urgency' | 'distance' | 'newest' | 'fulfillment'
+}
+
+// ── Collection Drives ─────────────────────────────────────────────────────
+
+export interface CollectionDrive {
+  id: string
+  collector_id: string
+  collector_name?: string
+  from_city: string
+  to_city: string
+  destination_city?: string
+  linked_request_id?: string
+  destination_event: string
+  departure_date: string
+  vehicle_type: string
+  capacity_kg: number
+  needs: string[]
+  status: 'open' | 'completed' | 'cancelled' | string
+  created_at: string
+  profiles?: {
+    full_name?: string
+    phone?: string
+  } | null
 }

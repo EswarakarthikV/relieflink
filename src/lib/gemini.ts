@@ -405,3 +405,156 @@ Return ONLY valid JSON, no markdown fences, no explanations:
   }
 }
 
+const REGIONAL_SUPPLY_DICTIONARY: Record<string, string> = {
+  // Water
+  paani: 'water',
+  pani: 'water',
+  thanni: 'water',
+  tanni: 'water',
+  neer: 'water',
+  jal: 'water',
+  vellam: 'water',
+
+  // Food / Meals
+  khana: 'food',
+  bhojan: 'food',
+  unavu: 'food',
+  saapadu: 'food',
+  ahar: 'food',
+  anna: 'food',
+
+  // Rice / Grains
+  chawal: 'rice',
+  arisi: 'rice',
+  bhaat: 'rice',
+  dhan: 'rice',
+  gehu: 'wheat',
+  godhumai: 'wheat',
+  dal: 'pulses',
+  paruppu: 'pulses',
+
+  // Medical / Medicines
+  dawai: 'medicine',
+  dawa: 'medicine',
+  marundhu: 'medicine',
+  aushadh: 'medicine',
+  tablets: 'medicine',
+  capsules: 'medicine',
+  paracetamol: 'medicine',
+  saline: 'medicine',
+  ors: 'medicine',
+
+  // Blanket / Shelter / Clothes
+  kambal: 'blanket',
+  kambili: 'blanket',
+  kambuli: 'blanket',
+  bedsheet: 'blanket',
+  chadar: 'blanket',
+  razai: 'blanket',
+  kapde: 'cloth',
+  thuni: 'cloth',
+  vastra: 'cloth',
+  dress: 'cloth',
+  tirpaal: 'tarpaulin',
+  tarpaulin: 'tarpaulin',
+  tent: 'shelter',
+
+  // Milk / Infant
+  doodh: 'milk',
+  paal: 'milk',
+}
+
+/**
+ * Normalizes a user's search query (including Tanglish, Hinglish, regional language terms, or synonyms)
+ * to a standard English supply name using Sarvam AI (with Gemini fallback and local dictionary).
+ */
+export async function normalizeSearchQuery(queryText: string): Promise<string> {
+  const trimmed = queryText.trim()
+  if (!trimmed || trimmed.length <= 2) {
+    return trimmed
+  }
+
+  const lower = trimmed.toLowerCase()
+  if (REGIONAL_SUPPLY_DICTIONARY[lower]) {
+    return REGIONAL_SUPPLY_DICTIONARY[lower]
+  }
+
+  const sarvamKey = (import.meta.env.VITE_SARVAM_API_KEY as string | undefined)?.trim()
+  const geminiKey = (import.meta.env.VITE_GEMINI_API_KEY as string | undefined)?.trim()
+
+  const prompt = `You are a search normalizer for an Indian disaster relief app. 
+Translate the following local language or Tanglish/Hinglish term into the standard English supply name. 
+Examples: paani/pani/thanni/neer/tanni -> water, khana/unavu/saapadu -> food, chawal/arisi -> rice, kapde/thuni -> cloth, kambal/kambili/kambuli/bedsheet -> blanket, dawai/marundhu -> medicine.
+If the input is already standard English, return it as is.
+Return ONLY the single English word, nothing else. No explanations.
+
+User input: ${trimmed}`
+
+  let rawOutput = ''
+  let originalError: any = null
+
+  if (sarvamKey) {
+    try {
+      rawOutput = await callSarvamAPI(prompt, sarvamKey, {
+        useResponseFormat: false,
+        label: 'SearchNormalize',
+        systemPrompt: 'You are a search normalizer. Return ONLY the single English word, nothing else. No explanations.',
+      })
+    } catch (err) {
+      console.warn('Sarvam search normalization failed:', err)
+      originalError = err
+    }
+  }
+
+  if (!rawOutput && geminiKey) {
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${geminiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text: prompt,
+                  },
+                ],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.1,
+            },
+          }),
+        },
+      )
+      if (response.ok) {
+        const data = await response.json()
+        rawOutput = data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+      }
+    } catch (geminiErr) {
+      console.warn('Gemini search normalization fallback failed:', geminiErr)
+    }
+  }
+
+  if (!rawOutput) {
+    // If AI fails or no keys available, fallback to the original query text
+    return trimmed
+  }
+
+  // Clean output (remove markdown, extra spaces, punctuation, quotes)
+  const cleaned = rawOutput
+    .replace(/^```[a-z]*\s*/i, '')
+    .replace(/```\s*$/i, '')
+    .replace(/[".`,]/g, '')
+    .trim()
+    .toLowerCase()
+
+  // Take the first line/word if multiple words returned
+  const normalizedWord = cleaned.split(/\s+/)[0] || trimmed.toLowerCase()
+  return normalizedWord || trimmed
+}
+

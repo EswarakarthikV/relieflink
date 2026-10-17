@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { Home, Compass, ClipboardList, Plus, User } from 'lucide-react'
+import { Home, Compass, ClipboardList, Plus, User, Truck, Heart } from 'lucide-react'
 import { cn } from '@/utils/cn'
 
 interface SidebarProps {
@@ -9,7 +9,10 @@ interface SidebarProps {
 
 export function Sidebar({ className, onCreateClick }: SidebarProps) {
   const location = useLocation()
-  const isCreateActive = location.pathname === '/create' || location.pathname === '/create-drive'
+  const isCreateActive =
+    location.pathname === '/create' ||
+    location.pathname === '/create-drive' ||
+    location.pathname === '/drives/create'
 
   return (
     <aside
@@ -22,29 +25,17 @@ export function Sidebar({ className, onCreateClick }: SidebarProps) {
     >
       {/* ── Top section: Logo & Nav List ─────────────────────────── */}
       <div className="flex flex-col gap-6">
-        {/* Logo (droplet icon + wordmark) */}
+        {/* Logo (official brand asset + wordmark) */}
         <NavLink
           to="/home"
           className="flex items-center gap-3 px-2 py-2 rounded-input hover:bg-white/5 transition-colors"
           aria-label="ReliefLink Home"
         >
-          <div className="w-9 h-9 rounded-input bg-brand-600 flex items-center justify-center shrink-0 shadow-sm">
-            <svg
-              className="w-5 h-5 text-white"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
-              <path
-                d="M12 12.5a2.5 2.5 0 0 0-2.5 2.5c0 1.5 2.5 3.5 2.5 3.5s2.5-2 2.5-3.5a2.5 2.5 0 0 0-2.5-2.5z"
-                fill="currentColor"
-              />
-            </svg>
-          </div>
+          <img
+            src="/icons/icon-192.png"
+            alt="ReliefLink"
+            className="w-9 h-9 rounded-input object-cover shrink-0 shadow-sm border border-brand-teal/20"
+          />
           <span className="text-h3 font-bold text-white tracking-tight">ReliefLink</span>
         </NavLink>
 
@@ -80,6 +71,38 @@ export function Sidebar({ className, onCreateClick }: SidebarProps) {
           >
             <Compass className="w-6 h-6 shrink-0" strokeWidth={2} />
             <span className="text-body font-medium">Browse</span>
+          </NavLink>
+
+          {/* Drives */}
+          <NavLink
+            to="/drives"
+            className={({ isActive }) =>
+              cn(
+                'flex items-center gap-3 px-3 h-[44px] rounded-pill text-body transition-colors relative',
+                isActive
+                  ? 'bg-brand-600 text-white font-semibold shadow-sm'
+                  : 'text-brand-100 hover:text-white hover:bg-white/10 font-medium',
+              )
+            }
+          >
+            <Truck className="w-6 h-6 shrink-0" strokeWidth={2} />
+            <span className="text-body font-medium">Drives</span>
+          </NavLink>
+
+          {/* Donations */}
+          <NavLink
+            to="/browse-donations"
+            className={({ isActive }) =>
+              cn(
+                'flex items-center gap-3 px-3 h-[44px] rounded-pill text-body transition-colors relative',
+                isActive
+                  ? 'bg-brand-600 text-white font-semibold shadow-sm'
+                  : 'text-brand-100 hover:text-white hover:bg-white/10 font-medium',
+              )
+            }
+          >
+            <Heart className="w-6 h-6 shrink-0" strokeWidth={2} />
+            <span className="text-body font-medium">Donations</span>
           </NavLink>
 
           {/* My Requests */}

@@ -19,6 +19,7 @@ const MOCK_REQUESTS: Request[] = [
     items: [
       { id: '71f59a32-b4c5-4143-b878-786ddd766680', name: 'Drinking water', unit: 'bottles', quantityRequested: 200, quantityCommitted: 120, quantityDelivered: 0, category: 'Water' },
       { id: '2978245a-cb1c-4c39-b016-db134a38ed55', name: 'Hygiene kits',   unit: 'kits',    quantityRequested: 50,  quantityCommitted: 20,  quantityDelivered: 0, category: 'Hygiene' },
+      { id: 'ac83ebbc-8afa-4cc5-a84c-efbcbbd5958e', name: 'Blankets',       unit: 'units',   quantityRequested: 30,  quantityCommitted: 0,   quantityDelivered: 0, category: 'Shelter' },
     ],
     createdAt: new Date(Date.now() - 2 * 3_600_000).toISOString(),
     updatedAt: new Date(Date.now() - 30 * 60_000).toISOString(),
@@ -130,6 +131,13 @@ async function fetchRequests(_filters?: RequestFilters): Promise<PaginatedRespon
             urgency: r.urgency || 'medium',
             status: r.status || 'open',
             location: r.city || r.address_line || 'Pune',
+            address_line: r.address_line || undefined,
+            city: r.city || undefined,
+            latitude: r.latitude != null ? Number(r.latitude) : null,
+            longitude: r.longitude != null ? Number(r.longitude) : null,
+            coordinates: r.latitude != null && r.longitude != null
+              ? { lat: Number(r.latitude), lng: Number(r.longitude) }
+              : undefined,
             distanceKm: 2.5,
             donorCount: 0,
             requesterId: r.requester_id || 'usr-req',
@@ -192,6 +200,11 @@ async function fetchRequest(id: string): Promise<Request> {
           location: r.city || r.address_line || 'Pune',
           address_line: r.address_line || undefined,
           city: r.city || undefined,
+          latitude: r.latitude != null ? Number(r.latitude) : null,
+          longitude: r.longitude != null ? Number(r.longitude) : null,
+          coordinates: r.latitude != null && r.longitude != null
+            ? { lat: Number(r.latitude), lng: Number(r.longitude) }
+            : undefined,
           distanceKm: 2.5,
           donorCount: 0,
           requesterId: r.requester_id || 'usr-req',

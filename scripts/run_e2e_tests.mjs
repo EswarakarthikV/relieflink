@@ -296,18 +296,17 @@ async function run() {
       )
     }
 
-    // Set valid quantity and submit
-    if (await qtyInput.isVisible()) {
-      await qtyInput.fill('10')
-      await qtyInput.dispatchEvent('input')
-      await qtyInput.dispatchEvent('change')
+    // Test quick-pick chip
+    const quickPickChip = donorPage.locator('button:has-text("10"), button:has-text("25")').first()
+    if (await quickPickChip.isVisible()) {
+      await quickPickChip.click()
+      await donorPage.waitForTimeout(300)
     }
 
     const confirmCommitment = donorPage.locator('input[type="checkbox"]').first()
-    if (await confirmCommitment.isVisible()) {
-      const isChecked = await confirmCommitment.isChecked()
-      if (!isChecked) await confirmCommitment.check()
-    }
+    await confirmCommitment.scrollIntoViewIfNeeded()
+    await confirmCommitment.check({ force: true })
+    await donorPage.waitForTimeout(400)
 
     const submitOfferBtn = donorPage.locator('button:has-text("Submit offer")')
     if (await submitOfferBtn.isVisible()) {

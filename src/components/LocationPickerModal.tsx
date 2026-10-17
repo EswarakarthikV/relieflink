@@ -6,7 +6,7 @@ import markerIcon from 'leaflet/dist/images/marker-icon.png'
 import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
-import { MapPin, Loader2, Search } from 'lucide-react'
+import { MapPin, Loader2, Search, Crosshair } from 'lucide-react'
 
 // Fix the Leaflet marker icon bug (known issue)
 delete (L.Icon.Default.prototype as any)._getIconUrl
@@ -107,6 +107,34 @@ function DraggableMarker({
   )
 }
 
+/**
+ * Clean place name by filtering out raw administrative ward/zone tokens
+ * (e.g. "Ward 37", "Ward 51", "East Zone") while preserving the actual location,
+ * locality, and city.
+ */
+export function cleanPlaceDisplayName(rawDisplayName: string): string {
+  if (!rawDisplayName) return ''
+  const parts = rawDisplayName.split(',').map(s => s.trim()).filter(Boolean)
+  // Filter out standalone administrative wards or zones unless there are no other parts
+  const meaningful = parts.filter(p => !/^(ward|zone)\s*\d+/i.test(p) && !/^\d+\s*(ward|zone)/i.test(p))
+  const candidate = meaningful.length > 0 ? meaningful : parts
+
+  // Deduplicate consecutive or identical components (e.g. "Coimbatore, Coimbatore")
+  const deduped: string[] = []
+  for (const item of candidate) {
+    if (!deduped.some(existing => existing.toLowerCase() === item.toLowerCase())) {
+      deduped.push(item)
+    }
+  }
+
+  // Remove country ('India') if we have at least 2 other components
+  const finalParts = (deduped.length > 2 && deduped[deduped.length - 1] === 'India')
+    ? deduped.slice(0, -1)
+    : deduped
+
+  return finalParts.slice(0, 3).join(', ')
+}
+
 export async function reverseGeocodeNominatim(lat: number, lng: number, returnFullDisplayName = false): Promise<string> {
   try {
     const res = await fetch(
@@ -123,18 +151,26 @@ export async function reverseGeocodeNominatim(lat: number, lng: number, returnFu
 
     if (returnFullDisplayName) {
       if (data.display_name) {
-        return data.display_name
+        return cleanPlaceDisplayName(data.display_name) || data.display_name
       }
       throw new Error('No display_name returned')
     }
 
+    // Try structured address fields, ensuring we avoid generic administrative wards as the locality
     if (data.address) {
-      const locality =
+      const rawLocality =
+        data.address.amenity ||
+        data.address.building ||
+        data.address.commercial ||
         data.address.suburb ||
         data.address.neighbourhood ||
         data.address.quarter ||
         data.address.residential ||
         data.address.road
+
+      // Avoid using "Ward XX" as the locality if a specific road or neighbourhood exists or if cleaned display_name is better
+      const isWard = rawLocality && (/^(ward|zone)\s*\d+/i.test(rawLocality) || /^\d+\s*(ward|zone)/i.test(rawLocality))
+      const locality = isWard ? (data.address.road || data.address.neighbourhood || undefined) : rawLocality
 
       const city =
         data.address.city ||
@@ -146,14 +182,13 @@ export async function reverseGeocodeNominatim(lat: number, lng: number, returnFu
       const state = data.address.state
 
       const parts = [locality, city, state].filter(Boolean)
-      if (parts.length > 0) {
+      if (parts.length >= 2) {
         return parts.join(', ')
       }
     }
 
     if (data.display_name) {
-      const parts = data.display_name.split(',').map((s: string) => s.trim())
-      return parts.slice(0, 3).join(', ')
+      return cleanPlaceDisplayName(data.display_name)
     }
   } catch (err) {
     if (returnFullDisplayName) {
@@ -183,6 +218,9 @@ export function LocationPickerModal({
   const [showDropdown, setShowDropdown] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
   const [targetView, setTargetView] = useState<{ lat: number; lng: number; zoom: number; key: number } | null>(null)
+  // Track specifically chosen search result place name so reverse geocoding doesn't overwrite it
+  const [selectedPlaceName, setSelectedPlaceName] = useState<string | null>(null)
+
   const mapRef = useRef<L.Map | null>(null)
   const searchContainerRef = useRef<HTMLDivElement>(null)
 
@@ -199,6 +237,7 @@ export function LocationPickerModal({
       setShowDropdown(false)
       setSearchError(null)
       setTargetView(null)
+      setSelectedPlaceName(null)
     }
   }, [isOpen, initialLat, initialLng])
 
@@ -222,9 +261,17 @@ export function LocationPickerModal({
       }
       setPosition({ lat, lng })
       setTargetView({ lat, lng, zoom: 16, key: Date.now() })
-      setSearchQuery(truncateText(place.display_name, 60))
+      const cleanName = cleanPlaceDisplayName(place.display_name)
+      setSelectedPlaceName(cleanName)
+      setSearchQuery(truncateText(cleanName, 60))
       setShowDropdown(false)
     }
+  }
+
+  const handlePositionChange = (pos: { lat: number; lng: number }) => {
+    setPosition(pos)
+    // If the user manually drags the pin away from the searched place, clear the forced place name
+    setSelectedPlaceName(null)
   }
 
   const handleSearch = async (isEnterKey = false) => {
@@ -272,6 +319,27 @@ export function LocationPickerModal({
     }
   }
 
+  const [isLocatingCurrent, setIsLocatingCurrent] = useState(false)
+
+  const handleLocateCurrent = () => {
+    if (!navigator.geolocation) return
+    setIsLocatingCurrent(true)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setIsLocatingCurrent(false)
+        const lat = pos.coords.latitude
+        const lng = pos.coords.longitude
+        setPosition({ lat, lng })
+        setTargetView({ lat, lng, zoom: 16, key: Date.now() })
+        setSelectedPlaceName(null)
+      },
+      () => {
+        setIsLocatingCurrent(false)
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    )
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault()
@@ -284,8 +352,12 @@ export function LocationPickerModal({
   const handleConfirm = async () => {
     setIsConfirming(true)
     try {
-      const address = await reverseGeocodeNominatim(position.lat, position.lng)
-      onConfirm(address, position.lat, position.lng)
+      // 1. If user selected a specific named search result, PRESERVE that place name!
+      let finalAddress = selectedPlaceName
+      if (!finalAddress) {
+        finalAddress = await reverseGeocodeNominatim(position.lat, position.lng)
+      }
+      onConfirm(finalAddress, position.lat, position.lng)
       onClose()
     } finally {
       setIsConfirming(false)
@@ -377,9 +449,24 @@ export function LocationPickerModal({
               />
               <MapResizer />
               <MapViewController targetView={targetView} />
-              <DraggableMarker position={position} setPosition={setPosition} />
+              <DraggableMarker position={position} setPosition={handlePositionChange} />
             </MapContainer>
           )}
+
+          <button
+            type="button"
+            onClick={handleLocateCurrent}
+            disabled={isLocatingCurrent}
+            title="Use my current GPS location"
+            className="absolute right-3 top-3 z-[400] bg-white/95 hover:bg-white active:bg-slate-100 text-ink border border-slate-300 rounded-lg shadow-md px-2.5 py-1.5 text-[12px] font-semibold flex items-center gap-1.5 transition-all"
+          >
+            {isLocatingCurrent ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-brand-600" />
+            ) : (
+              <Crosshair className="w-3.5 h-3.5 text-brand-600" />
+            )}
+            <span>Locate me</span>
+          </button>
         </div>
 
         {/* Coordinates status badge */}
@@ -390,7 +477,9 @@ export function LocationPickerModal({
               {position.lat.toFixed(5)}, {position.lng.toFixed(5)}
             </span>
           </div>
-          <span className="text-ink-muted">Center: Pune</span>
+          <span className="text-ink-muted truncate max-w-[200px]">
+            {selectedPlaceName ? truncateText(selectedPlaceName, 30) : 'GPS Pin'}
+          </span>
         </div>
 
         {/* Action Buttons */}

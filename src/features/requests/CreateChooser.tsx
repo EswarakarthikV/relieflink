@@ -82,7 +82,7 @@ export function CreateChooser({ isOpen, onClose }: CreateChooserProps) {
           {/* Card B: Start a collection drive */}
           <button
             type="button"
-            onClick={() => handleSelect('/create-drive')}
+            onClick={() => handleSelect('/drives/create')}
             className="w-full text-left bg-surface rounded-card p-4 border border-slate-200 shadow-card hover:shadow-[0_4px_12px_rgba(11,36,71,0.12)] transition-all flex items-center gap-4 group active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:outline-none"
           >
             <div className="w-12 h-12 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center shrink-0 group-hover:bg-brand-600 group-hover:text-white transition-colors">

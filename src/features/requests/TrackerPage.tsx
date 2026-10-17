@@ -418,15 +418,18 @@ export function TrackerPage() {
 
                     {/* ── Status-Driven Action Buttons ──────────────────────────────── */}
                     {(() => {
-                      const isDonor = Boolean(user?.id && offer.donor_id && user.id === offer.donor_id)
-                      const isRequester = Boolean(user?.id && req?.requesterId && user.id === req.requesterId)
-                      const isDonorRole = isDonor || (rolePerspective === 'donor' && !isRequester)
-                      const isRequesterRole = isRequester || (rolePerspective === 'requester' && !isDonor)
+                      const isActualDonor = Boolean(user?.id && offer.donor_id && user.id === offer.donor_id)
+                      const isActualRequester = Boolean(user?.id && req?.requesterId && user.id === req.requesterId)
+
+                      // If current user is the donor of this offer, ALWAYS show donor actions regardless of rolePerspective toggle
+                      // If not actual donor/requester (e.g. testing/preview mode), fall back to rolePerspective
+                      const showDonorActions = isActualDonor || (!isActualRequester && rolePerspective === 'donor')
+                      const showRequesterActions = isActualRequester || (!isActualDonor && rolePerspective === 'requester')
 
                       return (
                         <div className="pt-2 border-t border-slate-100">
                           {/* 1. Pending: Donor can Mark as dispatched or Cancel */}
-                          {offer.status === 'pending' && isDonorRole && (
+                          {offer.status === 'pending' && showDonorActions && (
                             <div className="flex items-center justify-between gap-3">
                               <Button
                                 variant="primary"
@@ -448,8 +451,8 @@ export function TrackerPage() {
                             </div>
                           )}
 
-                          {/* Pending: Requester view */}
-                          {offer.status === 'pending' && isRequesterRole && !isDonor && (
+                          {/* Pending: Requester view (when not showing donor actions) */}
+                          {offer.status === 'pending' && showRequesterActions && !showDonorActions && (
                             <div className="flex items-center justify-between gap-3">
                               <span className="text-caption text-ink-muted font-medium bg-slate-100 px-2.5 py-1 rounded-pill">
                                 Awaiting dispatch
@@ -466,7 +469,7 @@ export function TrackerPage() {
                           )}
 
                           {/* 2. Dispatched: Requester sees full-width Confirm received */}
-                          {offer.status === 'dispatched' && isRequesterRole && (
+                          {offer.status === 'dispatched' && showRequesterActions && (
                             <Button
                               variant="primary"
                               fullWidth
@@ -480,7 +483,7 @@ export function TrackerPage() {
                           )}
 
                           {/* Dispatched: Donor sees static text */}
-                          {offer.status === 'dispatched' && isDonorRole && !isRequester && (
+                          {offer.status === 'dispatched' && showDonorActions && !showRequesterActions && (
                             <div className="text-caption text-ink-muted flex items-center gap-1.5 font-medium py-1">
                               <Truck className="w-4 h-4 text-warning" />
                               <span>🚚 Dispatched. Awaiting confirmation.</span>

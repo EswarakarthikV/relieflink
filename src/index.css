@@ -94,3 +94,52 @@
     transform: scale(0.97);
   }
 }
+
+/* ── Custom Keyframes for Splash Screen ── */
+@keyframes splashGlowPulse {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.22;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.18);
+    opacity: 0.38;
+  }
+}
+
+@keyframes refinedPulse {
+  0%, 100% {
+    transform: scale(0.7);
+    opacity: 0.3;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+
+@keyframes shimmerLine {
+  0% {
+    stroke-dashoffset: 100;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-splash-glow {
+  animation: splashGlowPulse 4s ease-in-out infinite;
+}
+
+.animate-pulse-dot-1 {
+  animation: refinedPulse 1.4s ease-in-out infinite;
+}
+
+.animate-pulse-dot-2 {
+  animation: refinedPulse 1.4s ease-in-out 0.2s infinite;
+}
+
+.animate-pulse-dot-3 {
+  animation: refinedPulse 1.4s ease-in-out 0.4s infinite;
+}
+

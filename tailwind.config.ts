@@ -15,6 +15,11 @@ const config: Config = {
         'brand-600':      '#2563EB',
         'brand-100':      '#DBEAFE',
 
+        // ReliefLink Brand Palette
+        'brand-navy':     '#071426',
+        'brand-teal':     '#22D3C5',
+        'brand-amber':    '#FFBE55',
+
         // Application surfaces
         'bg-app':         '#F6F8FC',
         'surface':        '#FFFFFF',

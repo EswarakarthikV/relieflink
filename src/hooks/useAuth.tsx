@@ -7,11 +7,30 @@ export interface AuthContextType {
   isLoading: boolean
   isAuthenticated: boolean
   error: string | null
-  signIn: (email: string, password: string) => Promise<void>
+  signIn: (email: string, password: string) => Promise<{ data?: any; error?: any }>
+  upgradeAccount: (email: string, password: string) => Promise<{ data?: any; error?: any }>
   signOut: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+function mapSupabaseUser(sbUser: any): User {
+  const isAnon = Boolean(sbUser.is_anonymous)
+  const email = isAnon ? (sbUser.email || 'guest@relieflink.org') : (sbUser.email || '')
+  const name = sbUser.user_metadata?.full_name || (isAnon ? 'Guest Volunteer' : (email.split('@')[0] || 'Relief User'))
+  const initials = isAnon ? 'GV' : name.slice(0, 2).toUpperCase()
+
+  return {
+    id: sbUser.id,
+    email,
+    name,
+    role: 'donor',
+    avatarInitials: initials,
+    location: 'Pune',
+    createdAt: sbUser.created_at,
+    is_anonymous: isAnon,
+  }
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -20,15 +39,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
+      setUser({
+        id: 'anon-local',
+        email: 'guest@relieflink.org',
+        name: 'Guest Volunteer',
+        role: 'donor',
+        avatarInitials: 'GV',
+        location: 'Pune',
+        createdAt: new Date().toISOString(),
+        is_anonymous: true,
+      })
       setIsLoading(false)
       return
     }
 
-    // Step 1: On mount
-    // 1. Calls supabase.auth.getSession()
-    // 2. If session is null, calls supabase.auth.signInAnonymously()
-    // 3. Logs the result: console.log('Anon sign-in:', data, error)
-    // 4. Subscribes to onAuthStateChange
     const initAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
@@ -36,26 +60,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const { data, error } = await supabase.auth.signInAnonymously()
           console.log('Anon sign-in:', data, error)
           if (data?.user) {
-            setUser({
-              id: data.user.id,
-              email: data.user.email ?? 'anonymous@relieflink.org',
-              name: data.user.user_metadata?.full_name ?? 'Field Volunteer',
-              role: 'donor',
-              avatarInitials: 'FV',
-              location: 'Pune',
-              createdAt: data.user.created_at,
-            })
+            setUser(mapSupabaseUser(data.user))
           }
         } else if (session.user) {
-          setUser({
-            id: session.user.id,
-            email: session.user.email ?? 'anonymous@relieflink.org',
-            name: session.user.user_metadata?.full_name ?? (session.user.is_anonymous ? 'Field Volunteer' : 'Priya Sharma'),
-            role: 'donor',
-            avatarInitials: session.user.is_anonymous ? 'FV' : 'PS',
-            location: 'Pune',
-            createdAt: session.user.created_at,
-          })
+          setUser(mapSupabaseUser(session.user))
         }
       } catch (err: any) {
         console.error('Anonymous sign-in error:', err?.message)
@@ -68,15 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
-        setUser({
-          id: session.user.id,
-          email: session.user.email ?? 'anonymous@relieflink.org',
-          name: session.user.user_metadata?.full_name ?? (session.user.is_anonymous ? 'Field Volunteer' : 'Priya Sharma'),
-          role: 'donor',
-          avatarInitials: session.user.is_anonymous ? 'FV' : 'PS',
-          location: 'Pune',
-          createdAt: session.user.created_at,
-        })
+        setUser(mapSupabaseUser(session.user))
       } else {
         setUser(null)
       }
@@ -90,29 +90,82 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(true)
     setError(null)
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) throw error
-      if (data.user) {
-        setUser({
-          id: data.user.id,
-          email: data.user.email ?? email,
-          name: data.user.user_metadata?.full_name ?? email.split('@')[0],
+      if (!isSupabaseConfigured) {
+        const mockUser: User = {
+          id: `usr-${Date.now()}`,
+          email,
+          name: email.split('@')[0],
           role: 'donor',
-          avatarInitials: (data.user.user_metadata?.full_name ?? email).slice(0, 2).toUpperCase(),
+          avatarInitials: email.slice(0, 2).toUpperCase(),
           location: 'Pune',
-          createdAt: data.user.created_at,
-        })
+          createdAt: new Date().toISOString(),
+          is_anonymous: false,
+        }
+        setUser(mockUser)
+        return { data: { user: mockUser }, error: null }
       }
+
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+      if (signInError) throw signInError
+      if (data?.user) {
+        setUser(mapSupabaseUser(data.user))
+      }
+      return { data, error: null }
     } catch (err: any) {
-      setError(err?.message || 'Sign in failed')
+      const msg = err?.message || 'Sign in failed'
+      setError(msg)
+      return { data: null, error: err }
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  const upgradeAccount = useCallback(async (email: string, password: string) => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      if (!isSupabaseConfigured) {
+        setUser(prev => (prev ? { ...prev, email, is_anonymous: false } : null))
+        return { data: { user: { email, is_anonymous: false } }, error: null }
+      }
+
+      const { data, error: updateError } = await supabase.auth.updateUser({ email, password })
+      if (updateError) throw updateError
+      if (data?.user) {
+        setUser(mapSupabaseUser(data.user))
+      }
+      return { data, error: null }
+    } catch (err: any) {
+      const msg = err?.message || 'Account upgrade failed'
+      setError(msg)
+      return { data: null, error: err }
     } finally {
       setIsLoading(false)
     }
   }, [])
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut()
-    setUser(null)
+    if (isSupabaseConfigured) {
+      await supabase.auth.signOut()
+      // Automatically re-sign-in anonymously so guest session is maintained
+      const { data } = await supabase.auth.signInAnonymously()
+      if (data?.user) {
+        setUser(mapSupabaseUser(data.user))
+      } else {
+        setUser(null)
+      }
+    } else {
+      setUser({
+        id: 'anon-local',
+        email: 'guest@relieflink.org',
+        name: 'Guest Volunteer',
+        role: 'donor',
+        avatarInitials: 'GV',
+        location: 'Pune',
+        createdAt: new Date().toISOString(),
+        is_anonymous: true,
+      })
+    }
   }, [])
 
   return (
@@ -123,6 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: Boolean(user),
         error,
         signIn,
+        upgradeAccount,
         signOut,
       }}
     >
@@ -139,7 +193,8 @@ export function useAuth() {
       isLoading: false,
       isAuthenticated: false,
       error: null,
-      signIn: async () => {},
+      signIn: async () => ({ error: new Error('AuthProvider not found') }),
+      upgradeAccount: async () => ({ error: new Error('AuthProvider not found') }),
       signOut: async () => {},
     }
   }

@@ -4,20 +4,9 @@ import {
   Compass,
   Plus,
   ClipboardList,
-  Bell,
   User,
 } from 'lucide-react'
 import { cn } from '@/utils/cn'
-import { useNotifications } from '@/hooks/useNotifications'
-
-// ── 5 tabs per spec override ──────────────────────────────────────────────
-const NAV_TABS = [
-  { to: '/home',        label: 'Home',        Icon: Home          },
-  { to: '/browse',      label: 'Browse',      Icon: Compass       },
-  // Create is the centre FAB — handled specially below
-  { to: '/my-requests', label: 'My Requests', Icon: ClipboardList },
-  { to: '/alerts',      label: 'Alerts',      Icon: Bell          },
-]
 
 interface BottomNavProps {
   onCreateClick?: () => void
@@ -25,7 +14,15 @@ interface BottomNavProps {
 
 export function BottomNav({ onCreateClick }: BottomNavProps = {}) {
   const location = useLocation()
-  const { unreadCount } = useNotifications()
+
+  const isHomeActive = location.pathname === '/' || location.pathname === '/home'
+  const isBrowseActive = location.pathname === '/browse'
+  const isCreateActive =
+    location.pathname === '/create' ||
+    location.pathname === '/create-drive' ||
+    location.pathname === '/drives/create'
+  const isMyRequestsActive = location.pathname === '/my-requests'
+  const isProfileActive = location.pathname === '/profile'
 
   return (
     <nav
@@ -38,39 +35,39 @@ export function BottomNav({ onCreateClick }: BottomNavProps = {}) {
     >
       <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2">
 
-        {/* Tab 1: Home */}
+        {/* 1. Home → links to / */}
         <NavLink
-          to="/home"
-          className={({ isActive }) =>
+          to="/"
+          className={() =>
             cn(
-              'flex flex-col items-center justify-center gap-0.5 min-h-touch min-w-[56px]',
+              'flex flex-col items-center justify-center gap-0.5 min-h-touch min-w-[48px]',
               'flex-1 rounded-input transition-colors',
-              isActive ? 'text-brand-600' : 'text-ink-muted hover:text-ink',
+              isHomeActive ? 'text-brand-600' : 'text-ink-muted hover:text-ink',
             )
           }
           aria-label="Home"
         >
-          <Home className="w-6 h-6" strokeWidth={location.pathname === '/home' ? 2.5 : 1.75} />
+          <Home className="w-6 h-6" strokeWidth={isHomeActive ? 2.5 : 1.75} />
           <span className="text-label font-medium">Home</span>
         </NavLink>
 
-        {/* Tab 2: Browse */}
+        {/* 2. Browse → links to /browse */}
         <NavLink
           to="/browse"
-          className={({ isActive }) =>
+          className={() =>
             cn(
-              'flex flex-col items-center justify-center gap-0.5 min-h-touch min-w-[56px]',
+              'flex flex-col items-center justify-center gap-0.5 min-h-touch min-w-[48px]',
               'flex-1 rounded-input transition-colors',
-              isActive ? 'text-brand-600' : 'text-ink-muted hover:text-ink',
+              isBrowseActive ? 'text-brand-600' : 'text-ink-muted hover:text-ink',
             )
           }
           aria-label="Browse requests"
         >
-          <Compass className="w-6 h-6" strokeWidth={location.pathname === '/browse' ? 2.5 : 1.75} />
+          <Compass className="w-6 h-6" strokeWidth={isBrowseActive ? 2.5 : 1.75} />
           <span className="text-label font-medium">Browse</span>
         </NavLink>
 
-        {/* Tab 3: Create — elevated circular FAB */}
+        {/* 3. Create (icon: Plus, elevated circular brand-600 button) → opens CreateChooser modal */}
         <button
           type="button"
           onClick={onCreateClick}
@@ -89,57 +86,43 @@ export function BottomNav({ onCreateClick }: BottomNavProps = {}) {
           <span
             className={cn(
               'text-label font-medium mt-0.5',
-              location.pathname === '/create' || location.pathname === '/create-drive'
-                ? 'text-brand-600'
-                : 'text-ink-muted',
+              isCreateActive ? 'text-brand-600' : 'text-ink-muted',
             )}
           >
             Create
           </span>
         </button>
 
-        {/* Tab 4: My Requests */}
+        {/* 4. My Requests → links to /my-requests */}
         <NavLink
           to="/my-requests"
-          className={({ isActive }) =>
+          className={() =>
             cn(
-              'flex flex-col items-center justify-center gap-0.5 min-h-touch min-w-[56px]',
+              'flex flex-col items-center justify-center gap-0.5 min-h-touch min-w-[48px]',
               'flex-1 rounded-input transition-colors',
-              isActive ? 'text-brand-600' : 'text-ink-muted hover:text-ink',
+              isMyRequestsActive ? 'text-brand-600' : 'text-ink-muted hover:text-ink',
             )
           }
           aria-label="My Requests"
         >
-          <ClipboardList className="w-6 h-6" strokeWidth={location.pathname === '/my-requests' ? 2.5 : 1.75} />
-          <span className="text-label font-medium">Requests</span>
+          <ClipboardList className="w-6 h-6" strokeWidth={isMyRequestsActive ? 2.5 : 1.75} />
+          <span className="text-label font-medium">My Requests</span>
         </NavLink>
 
-        {/* Tab 5: Alerts */}
+        {/* 5. Profile → links to /profile */}
         <NavLink
-          to="/alerts"
-          className={({ isActive }) =>
+          to="/profile"
+          className={() =>
             cn(
-              'flex flex-col items-center justify-center gap-0.5 min-h-touch min-w-[56px]',
-              'flex-1 rounded-input transition-colors relative',
-              isActive ? 'text-brand-600' : 'text-ink-muted hover:text-ink',
+              'flex flex-col items-center justify-center gap-0.5 min-h-touch min-w-[48px]',
+              'flex-1 rounded-input transition-colors',
+              isProfileActive ? 'text-brand-600' : 'text-ink-muted hover:text-ink',
             )
           }
-          aria-label="Alerts and notifications"
+          aria-label="Profile"
         >
-          {({ isActive }) => (
-            <>
-              <div className="relative">
-                <Bell className="w-6 h-6" strokeWidth={isActive ? 2.5 : 1.75} />
-                {/* Unread badge */}
-                {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-danger text-white text-[9px] font-bold flex items-center justify-center leading-none">
-                    {unreadCount}
-                  </span>
-                )}
-              </div>
-              <span className="text-label font-medium">Alerts</span>
-            </>
-          )}
+          <User className="w-6 h-6" strokeWidth={isProfileActive ? 2.5 : 1.75} />
+          <span className="text-label font-medium">Profile</span>
         </NavLink>
 
       </div>
