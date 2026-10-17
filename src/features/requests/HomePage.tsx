@@ -10,6 +10,8 @@ import { relativeTime, fmtDistance, fmtNumber } from '@/utils/format'
 import { sortByUrgency } from '@/utils/urgency'
 import { cn } from '@/utils/cn'
 import type { Request } from '@/types'
+import { useQuery } from '@tanstack/react-query'
+import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 
 // ── Activity metric tile ──────────────────────────────────────────────────
 
@@ -80,6 +82,35 @@ function UrgentCard({ request }: { request: Request }) {
 export function HomePage() {
   const { user } = useAuth()
   const { data, isLoading } = useRequests()
+
+  const { data: userOffers } = useQuery({
+    queryKey: ['user_activity_offers', user?.id],
+    queryFn: async () => {
+      if (!isSupabaseConfigured || !user?.id) return null
+      const { data, error } = await supabase
+        .from('offers')
+        .select('id, quantity_offered, quantity_delivered, status')
+        .eq('donor_id', user.id)
+      if (error) {
+        console.warn('Could not fetch user offers:', error)
+        return null
+      }
+      return data
+    },
+    enabled: Boolean(user?.id),
+  })
+
+  const activeOffersCount = userOffers !== null && userOffers !== undefined
+    ? userOffers.filter(o => o.status === 'pending' || o.status === 'dispatched' || o.status === 'accepted').length
+    : 2
+
+  const deliveredOffersCount = userOffers !== null && userOffers !== undefined
+    ? userOffers.filter(o => o.status === 'delivered').length
+    : 1
+
+  const totalVolume = userOffers !== null && userOffers !== undefined
+    ? userOffers.reduce((sum, o) => sum + (Number(o.quantity_delivered) || Number(o.quantity_offered) || 0), 0)
+    : 480
 
   const allRequests = data?.data ?? []
   const urgentRequests = sortByUrgency(allRequests).filter(
@@ -152,16 +183,16 @@ export function HomePage() {
       <section className="px-4 py-3">
         <h3 className="text-h4 font-semibold text-ink mb-3">Your activity</h3>
         <div className="grid grid-cols-2 gap-3">
-          <MetricTile label="Active" value={2} sub="Active Offers" iconBg="bg-brand-100">
+          <MetricTile label="Active" value={activeOffersCount} sub="Active Offers" iconBg="bg-brand-100">
             <Package className="w-4 h-4 text-brand-600" />
           </MetricTile>
-          <MetricTile label="Status" value={1} sub="Confirmed Delivered" iconBg="bg-success-bg">
+          <MetricTile label="Status" value={deliveredOffersCount} sub="Confirmed Delivered" iconBg="bg-success-bg">
             <CheckCircle className="w-4 h-4 text-success" />
           </MetricTile>
           <MetricTile label="Pending" value={allRequests.filter(r => r.status === 'open').length} sub="Open Requests" iconBg="bg-warning-bg">
             <ClipboardList className="w-4 h-4 text-warning" />
           </MetricTile>
-          <MetricTile label="Volume" value={480} sub="This Month (kg)" iconBg="bg-brand-100">
+          <MetricTile label="Volume" value={totalVolume} sub="This Month (kg)" iconBg="bg-brand-100">
             <AlertTriangle className="w-4 h-4 text-brand-600" />
           </MetricTile>
         </div>

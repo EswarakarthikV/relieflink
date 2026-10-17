@@ -131,9 +131,11 @@ export function BottomNav({ onCreateClick }: BottomNavProps = {}) {
               <div className="relative">
                 <Bell className="w-6 h-6" strokeWidth={isActive ? 2.5 : 1.75} />
                 {/* Unread badge */}
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-danger text-white text-[9px] font-bold flex items-center justify-center leading-none">
-                  {unreadCount}
-                </span>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-danger text-white text-[9px] font-bold flex items-center justify-center leading-none">
+                    {unreadCount}
+                  </span>
+                )}
               </div>
               <span className="text-label font-medium">Alerts</span>
             </>

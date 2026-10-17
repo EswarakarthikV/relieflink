@@ -35,9 +35,11 @@ export function AppShell({ children, hideNav = false, className }: AppShellProps
         >
           <div className="relative flex items-center justify-center">
             <Bell className="w-6 h-6" />
-            <span className="absolute -top-1 -right-1 px-1 min-w-[18px] h-[18px] rounded-full bg-danger text-white text-[10px] font-bold flex items-center justify-center leading-none shadow-sm">
-              {unreadCount}
-            </span>
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 px-1 min-w-[18px] h-[18px] rounded-full bg-danger text-white text-[10px] font-bold flex items-center justify-center leading-none shadow-sm">
+                {unreadCount}
+              </span>
+            )}
           </div>
         </Link>
       )}

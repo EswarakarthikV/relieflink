@@ -1,0 +1,170 @@
+[
+  {
+    "testName": "Direct URL Navigation: /home",
+    "result": "PASS",
+    "evidence": "HTTP status 200, page rendered content \"ReliefLink\" without 404",
+    "rootCause": "Vite client SPA routing missing rewrite rules on static servers",
+    "fix": "Added public/_redirects (/* /index.html 200) and netlify.toml rewrite"
+  },
+  {
+    "testName": "Direct URL Navigation: /browse",
+    "result": "PASS",
+    "evidence": "HTTP status 200, page rendered content \"Browse\" without 404",
+    "rootCause": "Vite client SPA routing missing rewrite rules on static servers",
+    "fix": "Added public/_redirects (/* /index.html 200) and netlify.toml rewrite"
+  },
+  {
+    "testName": "Direct URL Navigation: /my-requests",
+    "result": "PASS",
+    "evidence": "HTTP status 200, page rendered content \"My Requests\" without 404",
+    "rootCause": "Vite client SPA routing missing rewrite rules on static servers",
+    "fix": "Added public/_redirects (/* /index.html 200) and netlify.toml rewrite"
+  },
+  {
+    "testName": "Direct URL Navigation: /profile",
+    "result": "PASS",
+    "evidence": "HTTP status 200, page rendered content \"Profile\" without 404",
+    "rootCause": "Vite client SPA routing missing rewrite rules on static servers",
+    "fix": "Added public/_redirects (/* /index.html 200) and netlify.toml rewrite"
+  },
+  {
+    "testName": "Direct URL Navigation: /notifications",
+    "result": "PASS",
+    "evidence": "HTTP status 200, page rendered content \"Notifications\" without 404",
+    "rootCause": "Vite client SPA routing missing rewrite rules on static servers",
+    "fix": "Added public/_redirects (/* /index.html 200) and netlify.toml rewrite"
+  },
+  {
+    "testName": "Direct URL Navigation: /alerts",
+    "result": "PASS",
+    "evidence": "HTTP status 200, page rendered content \"Notifications\" without 404",
+    "rootCause": "Vite client SPA routing missing rewrite rules on static servers",
+    "fix": "Added public/_redirects (/* /index.html 200) and netlify.toml rewrite"
+  },
+  {
+    "testName": "Direct URL Navigation: /requests/req-001",
+    "result": "PASS",
+    "evidence": "HTTP status 200, page rendered content \"Drinking water\" without 404",
+    "rootCause": "Vite client SPA routing missing rewrite rules on static servers",
+    "fix": "Added public/_redirects (/* /index.html 200) and netlify.toml rewrite"
+  },
+  {
+    "testName": "Direct URL Navigation: /tracker/req-001",
+    "result": "PASS",
+    "evidence": "HTTP status 200, page rendered content \"REQ-2024-089\" without 404",
+    "rootCause": "Vite client SPA routing missing rewrite rules on static servers",
+    "fix": "Added public/_redirects (/* /index.html 200) and netlify.toml rewrite"
+  },
+  {
+    "testName": "Direct URL Navigation: /invalid-random-path-404",
+    "result": "PASS",
+    "evidence": "HTTP status 200, page rendered content \"ReliefLink\" without 404",
+    "rootCause": "Vite client SPA routing missing rewrite rules on static servers",
+    "fix": "Added public/_redirects (/* /index.html 200) and netlify.toml rewrite"
+  },
+  {
+    "testName": "Deep Route Page Refresh (/requests/req-001)",
+    "result": "PASS",
+    "evidence": "Page refreshed cleanly without 404 or state collapse",
+    "rootCause": "Static hosting serves 404 on subpaths without rewrite",
+    "fix": "public/_redirects fallback"
+  },
+  {
+    "testName": "Browser Back / Forward History Navigation",
+    "result": "PASS",
+    "evidence": "Navigated back to true and forward to true successfully",
+    "rootCause": "N/A",
+    "fix": "N/A"
+  },
+  {
+    "testName": "Desktop Viewport (1365x900): Fixed Sidebar Visibility",
+    "result": "PASS",
+    "evidence": "Sidebar visible: true",
+    "rootCause": "N/A",
+    "fix": "N/A"
+  },
+  {
+    "testName": "Mobile Viewport (390x844): Bottom Navigation Bar",
+    "result": "PASS",
+    "evidence": "Bottom navigation bar visible on mobile: true",
+    "rootCause": "N/A",
+    "fix": "N/A"
+  },
+  {
+    "testName": "Mobile Touch Targets (>= 44x44px)",
+    "result": "PASS",
+    "evidence": "All 5 bottom nav interactive targets have dimensions >= 44x44px",
+    "rootCause": "N/A",
+    "fix": "N/A"
+  },
+  {
+    "testName": "CreateChooser Modal Open / Close via Mobile FAB",
+    "result": "PASS",
+    "evidence": "Modal rendered: true",
+    "rootCause": "N/A",
+    "fix": "N/A"
+  },
+  {
+    "testName": "CreateChooser Modal Dismiss (Close Button / Escape)",
+    "result": "PASS",
+    "evidence": "Modal dismissed: true",
+    "rootCause": "N/A",
+    "fix": "N/A"
+  },
+  {
+    "testName": "Request Creation: Form Validation Enforcement",
+    "result": "PASS",
+    "evidence": "Validation error triggered on empty submission: true",
+    "rootCause": "N/A",
+    "fix": "N/A"
+  },
+  {
+    "testName": "Request Creation: Submission Lifecycle & Confirmation",
+    "result": "PASS",
+    "evidence": "Submitted successfully, confirmation screen rendered: true",
+    "rootCause": "N/A",
+    "fix": "N/A"
+  },
+  {
+    "testName": "Request Listing: Real-Time Availability in Public Browse Feed",
+    "result": "PASS",
+    "evidence": "Newly created request \"Automated QA Flood Relief Request 1792230231261\" found in Browse feed: true",
+    "rootCause": "N/A",
+    "fix": "N/A"
+  },
+  {
+    "testName": "Make Offer Bottom Sheet Opening",
+    "result": "PASS",
+    "evidence": "Make Offer sheet opened on /requests/req-001: true",
+    "rootCause": "N/A",
+    "fix": "N/A"
+  },
+  {
+    "testName": "Donor Offer Submission: Confirmation Lifecycle",
+    "result": "PASS",
+    "evidence": "Offer submission completed: true",
+    "rootCause": "N/A",
+    "fix": "N/A"
+  },
+  {
+    "testName": "Notifications: Mark All as Read Action & Toast",
+    "result": "PASS",
+    "evidence": "Toast displayed: true",
+    "rootCause": "N/A",
+    "fix": "N/A"
+  },
+  {
+    "testName": "Notification Count Badge: Disappears / Decreases When Read",
+    "result": "PASS",
+    "evidence": "Red unread count badge removed after mark-as-read: true",
+    "rootCause": "N/A",
+    "fix": "N/A"
+  },
+  {
+    "testName": "Session Persistence Across Page Reloads (/profile)",
+    "result": "PASS",
+    "evidence": "Session retained profile data after reload without logging out: true",
+    "rootCause": "N/A",
+    "fix": "N/A"
+  }
+]

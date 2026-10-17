@@ -280,7 +280,7 @@ export function RequestDetailPage() {
               fullWidth
               size="lg"
               onClick={() => setOfferOpen(true)}
-              disabled={req.status === 'fulfilled' || req.status === 'closed'}
+              disabled={req.status === 'fulfilled' || req.status === 'closed' || remaining <= 0}
             >
               Make an Offer
             </Button>

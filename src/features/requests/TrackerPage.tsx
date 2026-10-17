@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft, Clock, MapPin, Package, Truck, CheckCircle2, AlertTriangle, UserCheck, ShieldAlert } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
@@ -11,7 +11,7 @@ import { Toast } from '@/components/ui/Toast'
 import { useRequest, useRequestItemStats } from '@/hooks/useRequests'
 import { useOffers, updateMockOfferStatus, type TrackerOffer } from '@/hooks/useOffers'
 import { useAuth } from '@/hooks/useAuth'
-import { supabase } from '@/lib/supabase'
+import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import { queryClient } from '@/lib/queryClient'
 import { fmtNumber, relativeTime } from '@/utils/format'
 import { cn } from '@/utils/cn'
@@ -33,12 +33,19 @@ export function TrackerPage() {
 
   const { data: req, isLoading: isReqLoading, isError } = useRequest(id)
   const { data: stats = [] } = useRequestItemStats(id)
-  const { data: offers = [], isLoading: isOffersLoading } = useOffers(id)
+  const { data: offers = [], isLoading: isOffersLoading, refetch: refetchOffers } = useOffers(id)
 
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [rolePerspective, setRolePerspective] = useState<'requester' | 'donor'>('requester')
   const [loadingOfferId, setLoadingOfferId] = useState<string | null>(null)
   const [loadingAction, setLoadingAction] = useState<string | null>(null)
+
+  // 3. FIX THE INITIAL LOAD: Ensure get_request_offers RPC runs as soon as page loads
+  useEffect(() => {
+    if (id) {
+      refetchOffers()
+    }
+  }, [id, refetchOffers])
 
   const showToast = (msg: string) => {
     setToastMessage(msg)
@@ -56,6 +63,7 @@ export function TrackerPage() {
       queryClient.invalidateQueries({ queryKey: ['offers', id] }),
       queryClient.invalidateQueries({ queryKey: ['requests'] }),
     ])
+    await refetchOffers()
   }
 
   // ── Action Handlers ───────────────────────────────────────────────────────
@@ -66,15 +74,21 @@ export function TrackerPage() {
     setLoadingOfferId(offer.id)
     setLoadingAction('dispatch')
     try {
-      const { error } = await supabase.rpc('mark_dispatched', {
-        p_offer_id: offer.id,
-        p_qty: qty,
-      })
-      if (error) {
-        console.warn('RPC mark_dispatched error:', error)
+      if (isSupabaseConfigured) {
+        const { error } = await supabase.rpc('mark_dispatched', {
+          p_offer_id: offer.id,
+          p_qty: qty,
+        })
+        if (error) {
+          console.warn('RPC mark_dispatched error:', error)
+          showToast(`Error: ${error.message}`)
+        } else {
+          showToast('Marked as dispatched')
+        }
+      } else {
+        showToast('Marked as dispatched')
       }
-      showToast('Marked as dispatched')
-    } catch (err) {
+    } catch (err: any) {
       console.warn('Error calling mark_dispatched:', err)
       showToast('Marked as dispatched')
     }
@@ -96,14 +110,20 @@ export function TrackerPage() {
     setLoadingOfferId(offer.id)
     setLoadingAction('cancel')
     try {
-      const { error } = await supabase.rpc('cancel_offer', {
-        p_offer_id: offer.id,
-      })
-      if (error) {
-        console.warn('RPC cancel_offer error:', error)
+      if (isSupabaseConfigured) {
+        const { error } = await supabase.rpc('cancel_offer', {
+          p_offer_id: offer.id,
+        })
+        if (error) {
+          console.warn('RPC cancel_offer error:', error)
+          showToast(`Error: ${error.message}`)
+        } else {
+          showToast('Offer cancelled')
+        }
+      } else {
+        showToast('Offer cancelled')
       }
-      showToast('Offer cancelled')
-    } catch (err) {
+    } catch (err: any) {
       console.warn('Error calling cancel_offer:', err)
       showToast('Offer cancelled')
     }
@@ -122,15 +142,21 @@ export function TrackerPage() {
     setLoadingOfferId(offer.id)
     setLoadingAction('remove')
     try {
-      const { error } = await supabase.rpc('reject_offer', {
-        p_offer_id: offer.id,
-        p_reason: 'Removed by requester',
-      })
-      if (error) {
-        console.warn('RPC reject_offer error:', error)
+      if (isSupabaseConfigured) {
+        const { error } = await supabase.rpc('reject_offer', {
+          p_offer_id: offer.id,
+          p_reason: 'Removed by requester',
+        })
+        if (error) {
+          console.warn('RPC reject_offer error:', error)
+          showToast(`Error: ${error.message}`)
+        } else {
+          showToast('Offer removed')
+        }
+      } else {
+        showToast('Offer removed')
       }
-      showToast('Offer removed')
-    } catch (err) {
+    } catch (err: any) {
       console.warn('Error calling reject_offer:', err)
       showToast('Offer removed')
     }
@@ -148,15 +174,21 @@ export function TrackerPage() {
     setLoadingOfferId(offer.id)
     setLoadingAction('deliver')
     try {
-      const { error } = await supabase.rpc('confirm_delivery', {
-        p_offer_id: offer.id,
-        p_qty: qty,
-      })
-      if (error) {
-        console.warn('RPC confirm_delivery error:', error)
+      if (isSupabaseConfigured) {
+        const { error } = await supabase.rpc('confirm_delivery', {
+          p_offer_id: offer.id,
+          p_qty: qty,
+        })
+        if (error) {
+          console.warn('RPC confirm_delivery error:', error)
+          showToast(`Error: ${error.message}`)
+        } else {
+          showToast('Delivery confirmed')
+        }
+      } else {
+        showToast('Delivery confirmed')
       }
-      showToast('Delivery confirmed')
-    } catch (err) {
+    } catch (err: any) {
       console.warn('Error calling confirm_delivery:', err)
       showToast('Delivery confirmed')
     }
@@ -384,101 +416,94 @@ export function TrackerPage() {
                       </p>
                     )}
 
-                    {/* ── Status-Driven UI ──────────────────────────────── */}
+                    {/* ── Status-Driven Action Buttons ──────────────────────────────── */}
+                    {(() => {
+                      const isDonor = Boolean(user?.id && offer.donor_id && user.id === offer.donor_id)
+                      const isRequester = Boolean(user?.id && req?.requesterId && user.id === req.requesterId)
+                      const isDonorRole = isDonor || (rolePerspective === 'donor' && !isRequester)
+                      const isRequesterRole = isRequester || (rolePerspective === 'requester' && !isDonor)
 
-                    {/* View: DONOR */}
-                    {rolePerspective === 'donor' && (
-                      <div className="pt-2 border-t border-slate-100">
-                        {offer.status === 'pending' && (
-                          <div className="flex items-center justify-between gap-3">
+                      return (
+                        <div className="pt-2 border-t border-slate-100">
+                          {/* 1. Pending: Donor can Mark as dispatched or Cancel */}
+                          {offer.status === 'pending' && isDonorRole && (
+                            <div className="flex items-center justify-between gap-3">
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                isLoading={loadingOfferId === offer.id && loadingAction === 'dispatch'}
+                                disabled={Boolean(loadingOfferId)}
+                                onClick={() => handleMarkDispatched(offer)}
+                              >
+                                Mark as dispatched
+                              </Button>
+                              <button
+                                type="button"
+                                disabled={Boolean(loadingOfferId)}
+                                onClick={() => handleCancelOffer(offer)}
+                                className="text-danger hover:underline text-caption font-semibold cursor-pointer disabled:opacity-50"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Pending: Requester view */}
+                          {offer.status === 'pending' && isRequesterRole && !isDonor && (
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="text-caption text-ink-muted font-medium bg-slate-100 px-2.5 py-1 rounded-pill">
+                                Awaiting dispatch
+                              </span>
+                              <button
+                                type="button"
+                                disabled={Boolean(loadingOfferId)}
+                                onClick={() => handleRemoveOffer(offer)}
+                                className="text-danger hover:underline text-caption font-semibold cursor-pointer disabled:opacity-50"
+                              >
+                                Remove offer
+                              </button>
+                            </div>
+                          )}
+
+                          {/* 2. Dispatched: Requester sees full-width Confirm received */}
+                          {offer.status === 'dispatched' && isRequesterRole && (
                             <Button
                               variant="primary"
-                              size="sm"
-                              isLoading={loadingOfferId === offer.id && loadingAction === 'dispatch'}
+                              fullWidth
+                              className="bg-success hover:bg-green-700 text-white font-medium py-2.5 shadow-sm active:scale-[0.99]"
+                              isLoading={loadingOfferId === offer.id && loadingAction === 'deliver'}
                               disabled={Boolean(loadingOfferId)}
-                              onClick={() => handleMarkDispatched(offer)}
+                              onClick={() => handleConfirmDelivery(offer)}
                             >
-                              Mark as dispatched →
+                              <span>Confirm received ✓</span>
                             </Button>
-                            <button
-                              type="button"
-                              disabled={Boolean(loadingOfferId)}
-                              onClick={() => handleCancelOffer(offer)}
-                              className="text-danger hover:underline text-caption font-semibold cursor-pointer disabled:opacity-50"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        )}
+                          )}
 
-                        {offer.status === 'dispatched' && (
-                          <div className="text-caption text-ink-muted flex items-center gap-1.5 font-medium py-1">
-                            <Truck className="w-4 h-4 text-warning" />
-                            <span>🚚 Dispatched. Awaiting confirmation.</span>
-                          </div>
-                        )}
+                          {/* Dispatched: Donor sees static text */}
+                          {offer.status === 'dispatched' && isDonorRole && !isRequester && (
+                            <div className="text-caption text-ink-muted flex items-center gap-1.5 font-medium py-1">
+                              <Truck className="w-4 h-4 text-warning" />
+                              <span>🚚 Dispatched. Awaiting confirmation.</span>
+                            </div>
+                          )}
 
-                        {offer.status === 'delivered' && (
-                          <div className="text-caption text-success font-semibold flex items-center gap-1.5 bg-success-bg/40 px-3 py-2 rounded-input">
-                            <CheckCircle2 className="w-4 h-4 text-success" />
-                            <span>✓ Delivered on {formatConfirmedDate(offer.delivered_at)}</span>
-                          </div>
-                        )}
+                          {/* 3. Delivered: Static green check */}
+                          {offer.status === 'delivered' && (
+                            <div className="text-caption text-success font-semibold flex items-center gap-1.5 bg-success-bg/40 px-3 py-2 rounded-input">
+                              <CheckCircle2 className="w-4 h-4 text-success" />
+                              <span>✓ Delivered</span>
+                            </div>
+                          )}
 
-                        {(offer.status === 'cancelled' || offer.status === 'rejected') && (
-                          <div className="text-caption text-ink-muted italic py-1">
-                            {offer.status === 'cancelled' ? 'Cancelled' : 'Rejected'}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* View: REQUESTER */}
-                    {rolePerspective === 'requester' && (
-                      <div className="pt-2 border-t border-slate-100">
-                        {offer.status === 'pending' && (
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="text-caption text-ink-muted font-medium bg-slate-100 px-2.5 py-1 rounded-pill">
-                              Awaiting dispatch
-                            </span>
-                            <button
-                              type="button"
-                              disabled={Boolean(loadingOfferId)}
-                              onClick={() => handleRemoveOffer(offer)}
-                              className="text-danger hover:underline text-caption font-semibold cursor-pointer disabled:opacity-50"
-                            >
-                              Remove offer
-                            </button>
-                          </div>
-                        )}
-
-                        {offer.status === 'dispatched' && (
-                          <Button
-                            variant="primary"
-                            fullWidth
-                            className="bg-success hover:bg-green-700 text-white font-medium py-2.5 shadow-sm active:scale-[0.99]"
-                            isLoading={loadingOfferId === offer.id && loadingAction === 'deliver'}
-                            disabled={Boolean(loadingOfferId)}
-                            onClick={() => handleConfirmDelivery(offer)}
-                          >
-                            <span>Confirm received ✓</span>
-                          </Button>
-                        )}
-
-                        {offer.status === 'delivered' && (
-                          <div className="text-caption text-success font-semibold flex items-center gap-1.5 bg-success-bg/40 px-3 py-2 rounded-input">
-                            <CheckCircle2 className="w-4 h-4 text-success" />
-                            <span>✓ Delivered on {formatConfirmedDate(offer.delivered_at)}</span>
-                          </div>
-                        )}
-
-                        {(offer.status === 'cancelled' || offer.status === 'rejected') && (
-                          <div className="text-caption text-ink-muted italic py-1">
-                            {offer.status === 'cancelled' ? 'Cancelled' : 'Rejected'}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                          {/* 4. Cancelled or Rejected */}
+                          {(offer.status === 'cancelled' || offer.status === 'rejected') && (
+                            <div className="text-caption text-ink-muted italic py-1">
+                              {offer.status === 'cancelled' ? 'Cancelled' : 'Rejected'}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </div>
                 )
               })}

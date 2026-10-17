@@ -89,8 +89,11 @@ export function updateMockOfferStatus(
   })
 }
 
+const isValidUUID = (str: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)
+
 export async function fetchOffers(requestId: string): Promise<TrackerOffer[]> {
-  if (isSupabaseConfigured) {
+  if (isSupabaseConfigured && isValidUUID(requestId)) {
     try {
       // 1. Helper RPC that returns offers for a request ID regardless of who's viewing (bypasses RLS)
       const { data, error } = await supabase.rpc('get_request_offers', {
@@ -117,38 +120,15 @@ export async function fetchOffers(requestId: string): Promise<TrackerOffer[]> {
         }))
       }
 
-      // 2. Direct select fallback
-      const { data: directData, error: directErr } = await supabase
-        .from('offers')
-        .select('*, profiles:donor_id(full_name), request_items!inner(item_name)')
-        .eq('request_id', requestId)
-        .order('created_at', { ascending: false })
-
-      if (!directErr && directData) {
-        return directData.map((row: any): TrackerOffer => ({
-          id: row.id,
-          request_id: row.request_id,
-          request_item_id: row.request_item_id,
-          donor_id: row.donor_id,
-          donor_name: row.profiles?.full_name || 'Anonymous Donor',
-          item_name: row.request_items?.item_name || 'Supply item',
-          unit: 'units',
-          quantity_offered: Number(row.quantity_offered) || 0,
-          quantity_dispatched: Number(row.quantity_dispatched) || 0,
-          quantity_delivered: Number(row.quantity_delivered) || 0,
-          status: row.status as TrackerOffer['status'],
-          message: row.message || undefined,
-          dispatched_at: row.dispatched_at || undefined,
-          delivered_at: row.delivered_at || undefined,
-          created_at: row.created_at,
-        }))
+      if (error) {
+        console.warn('Error from get_request_offers RPC:', error)
       }
     } catch (err) {
-      console.warn('Error fetching offers from Supabase:', err)
+      console.warn('Error fetching offers from Supabase RPC:', err)
     }
   }
 
-  // Fallback to mock offers
+  // Fallback to mock offers for mock IDs like 'req-001' or offline dev
   return mockOffersStore.filter(o => o.request_id === requestId || requestId === 'req-001')
 }
 
@@ -157,5 +137,7 @@ export function useOffers(requestId: string) {
     queryKey: ['request_offers', requestId],
     queryFn: () => fetchOffers(requestId),
     enabled: Boolean(requestId),
+    refetchOnMount: 'always',
+    staleTime: 0,
   })
 }

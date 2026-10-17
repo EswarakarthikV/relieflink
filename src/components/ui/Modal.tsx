@@ -9,6 +9,7 @@ interface ModalProps {
   children: ReactNode
   className?: string
   maxWidth?: string
+  overlayClassName?: string
 }
 
 export function Modal({
@@ -18,6 +19,7 @@ export function Modal({
   children,
   className,
   maxWidth = 'max-w-md',
+  overlayClassName,
 }: ModalProps) {
   useEffect(() => {
     if (!isOpen) return
@@ -32,7 +34,10 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-900/75 backdrop-blur-[2px] transition-opacity animate-in fade-in duration-200"
+      className={cn(
+        'fixed inset-0 z-[60] flex items-center justify-center p-4 bg-navy-900/75 backdrop-blur-[2px] transition-opacity animate-in fade-in duration-200',
+        overlayClassName,
+      )}
       onClick={onClose}
       role="dialog"
       aria-modal="true"

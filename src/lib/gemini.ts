@@ -14,9 +14,17 @@ export interface EnhanceDescriptionResult {
   changed: boolean
 }
 
+export interface ItemMatchResult {
+  is_match: boolean
+  confidence: number
+  reasoning: string
+  converted_quantity: number | null
+}
+
 interface SarvamOptions {
   useResponseFormat?: boolean
-  label?: 'Title' | 'Description'
+  label?: 'Title' | 'Description' | 'ItemMatch' | string
+  systemPrompt?: string
 }
 
 const SYSTEM_PROMPT = `You are a disaster relief assistant that rewrites requests into clear, professional English. Output ONLY valid JSON.
@@ -47,7 +55,7 @@ async function callSarvamAPI(
       messages: [
         {
           role: 'system',
-          content: SYSTEM_PROMPT,
+          content: options.systemPrompt ?? SYSTEM_PROMPT,
         },
         {
           role: 'user',
@@ -61,10 +69,8 @@ async function callSarvamAPI(
       body.response_format = { type: 'json_object' }
     }
 
-    if (label === 'Title') {
-      console.log('Title body:', JSON.stringify(body))
-    } else if (label === 'Description') {
-      console.log('Description body:', JSON.stringify(body))
+    if (label) {
+      console.log(`${label} body:`, JSON.stringify(body))
     }
 
     const response = await fetch('https://api.sarvam.ai/v1/chat/completions', {
@@ -324,3 +330,78 @@ Return ONLY valid JSON, no markdown fences, no explanations:
     changed: Boolean(result.changed),
   }
 }
+
+/**
+ * Matches a donor's item description to the requested supply item using Sarvam AI (with Gemini fallback).
+ * Returns structured JSON with is_match, confidence, reasoning, and converted_quantity.
+ */
+export async function matchItemToRequest(
+  donorText: string,
+  requestItemName: string,
+  remainingQty: number,
+): Promise<ItemMatchResult> {
+  const sarvamKey = (import.meta.env.VITE_SARVAM_API_KEY as string | undefined)?.trim()
+  const geminiKey = (import.meta.env.VITE_GEMINI_API_KEY as string | undefined)?.trim()
+
+  const prompt = `You are matching disaster relief donations to requests.
+REQUESTER NEEDS: ${requestItemName} (remaining: ${remainingQty})
+DONOR OFFERS: ${donorText}
+Return ONLY valid JSON, no markdown fences, no explanations:
+{
+  "is_match": boolean,
+  "confidence": 0.0 to 1.0,
+  "reasoning": "one sentence",
+  "converted_quantity": number or null
+}`
+
+  let rawOutput = ''
+  let originalError: any = null
+
+  if (sarvamKey) {
+    try {
+      rawOutput = await callSarvamAPI(prompt, sarvamKey, {
+        useResponseFormat: false,
+        label: 'ItemMatch',
+        systemPrompt: 'You are a disaster relief assistant matching donations to requests. Output ONLY valid JSON.',
+      })
+      console.log('Item matched via: Sarvam')
+    } catch (err) {
+      originalError = err
+    }
+  }
+
+  if (!rawOutput) {
+    if (geminiKey) {
+      try {
+        rawOutput = await callGeminiAPI(prompt, geminiKey)
+        console.log('Item matched via: Gemini fallback')
+      } catch (geminiErr) {
+        throw originalError || geminiErr
+      }
+    } else {
+      throw originalError || new Error('No AI API key is configured. Please set VITE_SARVAM_API_KEY or VITE_GEMINI_API_KEY in .env.local')
+    }
+  }
+
+  const cleaned = rawOutput
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/```\s*$/i, '')
+    .trim()
+
+  let jsonString = cleaned
+  const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
+  if (jsonMatch) {
+    jsonString = jsonMatch[0]
+  }
+
+  const result = JSON.parse(jsonString)
+
+  return {
+    is_match: Boolean(result.is_match),
+    confidence: typeof result.confidence === 'number' ? result.confidence : (result.is_match ? 0.9 : 0.1),
+    reasoning: typeof result.reasoning === 'string' ? result.reasoning : '',
+    converted_quantity: typeof result.converted_quantity === 'number' ? result.converted_quantity : null,
+  }
+}
+
