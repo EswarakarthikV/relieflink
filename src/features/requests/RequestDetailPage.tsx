@@ -140,7 +140,7 @@ export function RequestDetailPage() {
                       : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
                           req.address_line && req.city
                             ? `${req.address_line}, ${req.city}`
-                            : req.address_line || req.city || req.location || 'Pune'
+                            : req.address_line || req.city || req.location || ''
                         )}`
                   }
                   target="_blank"

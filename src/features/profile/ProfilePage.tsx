@@ -10,10 +10,11 @@ import { Modal } from '@/components/ui/Modal'
 import { Toast } from '@/components/ui/Toast'
 import { StatusBadge } from '@/components/ui/Badge'
 import { PushNotificationSettings } from '@/components/notifications/PushNotificationSettings'
-import { LogOut, User, MapPin, Mail, Shield, Sparkles, ArrowRight, Lock, CheckCircle2, Phone, Save } from 'lucide-react'
+import { LocationPickerModal, reverseGeocodeNominatim } from '@/components/LocationPickerModal'
+import { LogOut, User, MapPin, Mail, Shield, Sparkles, ArrowRight, Lock, CheckCircle2, Phone, Save, Navigation } from 'lucide-react'
 
 export function ProfilePage() {
-  const { user, upgradeAccount, signOut, updateContactPhone } = useAuth()
+  const { user, upgradeAccount, signOut, updateContactPhone, updateLocation } = useAuth()
   const navigate = useNavigate()
 
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false)
@@ -24,6 +25,14 @@ export function ProfilePage() {
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 
   const [upgradeSuccessEmail, setUpgradeSuccessEmail] = useState<string | null>(null)
+
+  // Location state
+  const [locationInput, setLocationInput] = useState(user?.location || '')
+  const [isSavingLocation, setIsSavingLocation] = useState(false)
+  const [locationError, setLocationError] = useState<string | null>(null)
+  const [locationSaved, setLocationSaved] = useState(false)
+  const [isMapPickerOpen, setIsMapPickerOpen] = useState(false)
+  const [isLocating, setIsLocating] = useState(false)
 
   // Contact number state
   const [phoneInput, setPhoneInput] = useState(user?.phone || '')
@@ -37,6 +46,12 @@ export function ProfilePage() {
     }
   }, [user?.phone])
 
+  useEffect(() => {
+    if (user?.location) {
+      setLocationInput(user.location)
+    }
+  }, [user?.location])
+
   if (!user) return null
 
   const isAnonymous = Boolean(user.is_anonymous)
@@ -44,6 +59,69 @@ export function ProfilePage() {
   const showToast = (msg: string) => {
     setToastMessage(msg)
     setTimeout(() => setToastMessage(null), 4000)
+  }
+
+  const handleUseCurrentLocation = () => {
+    setLocationError(null)
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation is not supported by your browser')
+      return
+    }
+
+    setIsLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude
+        const lng = pos.coords.longitude
+        try {
+          const address = await reverseGeocodeNominatim(lat, lng, true)
+          if (address) {
+            setLocationInput(address)
+            setLocationError(null)
+          }
+        } catch {
+          showToast('Coordinates retrieved. Please type your city or address manually.')
+        } finally {
+          setIsLocating(false)
+        }
+      },
+      (err) => {
+        setIsLocating(false)
+        if (err.code === err.PERMISSION_DENIED) {
+          setLocationError('Location access denied. Please choose on map or type manually.')
+        } else {
+          setLocationError('Could not retrieve current location. Please choose on map or type manually.')
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    )
+  }
+
+  const handleMapConfirm = (address: string) => {
+    if (address) {
+      setLocationInput(address)
+      setLocationError(null)
+    }
+    setIsMapPickerOpen(false)
+  }
+
+  const handleSaveLocation = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLocationError(null)
+    setLocationSaved(false)
+
+    const trimmed = locationInput.trim()
+    setIsSavingLocation(true)
+    const { error } = await updateLocation(trimmed)
+    setIsSavingLocation(false)
+
+    if (error) {
+      setLocationError(error.message || 'Failed to save location')
+    } else {
+      setLocationSaved(true)
+      showToast(trimmed ? 'Location saved to your profile' : 'Location cleared')
+      setTimeout(() => setLocationSaved(false), 3000)
+    }
   }
 
   const handleSavePhone = async (e: React.FormEvent) => {
@@ -193,7 +271,7 @@ export function ProfilePage() {
               label: 'Saved Contact',
               value: user.phone || 'Not provided',
             },
-            { Icon: MapPin, label: 'Location', value: user.location ?? '—' },
+            { Icon: MapPin, label: 'Location', value: user.location || 'Not set' },
             { Icon: Shield, label: 'Account Type', value: isAnonymous ? 'Guest (Unsaved)' : 'Verified Member' },
             { Icon: User, label: 'Member since', value: new Date(user.createdAt).getFullYear().toString() },
           ].map(({ Icon, label, value }, i, arr) => (
@@ -211,6 +289,86 @@ export function ProfilePage() {
             </div>
           ))}
         </div>
+
+        {/* Location Management Card */}
+        <Card className="p-5 border border-slate-200/80 shadow-card flex flex-col gap-3">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center shrink-0 mt-0.5">
+              <MapPin className="w-4 h-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="text-body font-bold text-navy-900 leading-snug">
+                  Your Location
+                </h3>
+                {user.location && (
+                  <span className="text-[11px] font-semibold text-brand-600 bg-brand-50 border border-brand-200 px-2 py-0.5 rounded-pill">
+                    Saved in profile
+                  </span>
+                )}
+              </div>
+              <p className="text-caption text-ink-muted mt-1 leading-relaxed">
+                Set your primary city or neighborhood to view nearby relief needs and prefill dispatch forms.
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleSaveLocation} className="flex flex-col gap-3 pt-1">
+            <Input
+              id="profile-location-input"
+              label="City or Address"
+              type="text"
+              placeholder="e.g. Chennai, Tamil Nadu"
+              value={locationInput}
+              onChange={e => {
+                setLocationInput(e.target.value)
+                if (locationError) setLocationError(null)
+              }}
+              error={locationError || undefined}
+              leftIcon={<MapPin className="w-4 h-4" />}
+            />
+
+            {/* Location helper buttons */}
+            <div className="grid grid-cols-2 gap-2.5 -mt-0.5">
+              <button
+                type="button"
+                onClick={handleUseCurrentLocation}
+                disabled={isLocating}
+                className="h-10 px-3 rounded-input border border-slate-200 bg-surface hover:bg-slate-50 text-ink text-caption font-medium flex items-center justify-center gap-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 active:scale-[0.99] disabled:opacity-50"
+              >
+                <Navigation className="w-4 h-4 text-brand-600 shrink-0" />
+                <span className="truncate">{isLocating ? 'Locating...' : '📍 Use my location'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsMapPickerOpen(true)}
+                className="h-10 px-3 rounded-input border border-slate-200 bg-surface hover:bg-slate-50 text-ink text-caption font-medium flex items-center justify-center gap-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 active:scale-[0.99]"
+              >
+                <MapPin className="w-4 h-4 text-brand-600 shrink-0" />
+                <span className="truncate">🗺️ Choose on map</span>
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between gap-2 pt-1">
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                isLoading={isSavingLocation}
+                leftIcon={<Save className="w-3.5 h-3.5" />}
+              >
+                Save Location
+              </Button>
+
+              {locationSaved && (
+                <span className="text-caption text-success font-medium flex items-center gap-1 animate-in fade-in duration-200">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Saved!
+                </span>
+              )}
+            </div>
+          </form>
+        </Card>
 
         {/* Contact Phone Management Card */}
         <Card className="p-5 border border-slate-200/80 shadow-card flex flex-col gap-3">
@@ -390,6 +548,12 @@ export function ProfilePage() {
           </form>
         )}
       </Modal>
+
+      <LocationPickerModal
+        isOpen={isMapPickerOpen}
+        onClose={() => setIsMapPickerOpen(false)}
+        onConfirm={handleMapConfirm}
+      />
 
       <Toast message={toastMessage} visible={Boolean(toastMessage)} />
     </AppShell>

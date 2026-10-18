@@ -11,10 +11,23 @@ export interface AuthContextType {
   signUp: (email: string, password: string, fullName?: string) => Promise<{ data?: any; error?: any; requiresEmailVerification?: boolean }>
   upgradeAccount: (email: string, password: string) => Promise<{ data?: any; error?: any; requiresEmailVerification?: boolean }>
   updateContactPhone: (phone: string) => Promise<{ error?: any }>
+  updateLocation: (location: string) => Promise<{ error?: any }>
   signOut: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+function getLocalProfileLocation(userId?: string): string | undefined {
+  try {
+    if (userId) {
+      const scoped = localStorage.getItem(`relieflink_profile_location_${userId}`)
+      if (scoped) return scoped
+    }
+    return localStorage.getItem('relieflink_profile_location') || undefined
+  } catch {
+    return undefined
+  }
+}
 
 function mapSupabaseUser(sbUser: any, profilePhone?: string): User {
   const isAnon = Boolean(sbUser.is_anonymous)
@@ -28,13 +41,15 @@ function mapSupabaseUser(sbUser: any, profilePhone?: string): User {
     } catch {}
   }
 
+  const location = sbUser.user_metadata?.location || getLocalProfileLocation(sbUser.id)
+
   return {
     id: sbUser.id,
     email,
     name,
     role: 'donor',
     avatarInitials: initials,
-    location: 'Pune',
+    location: location || undefined,
     phone: phone || undefined,
     createdAt: sbUser.created_at,
     is_anonymous: isAnon,
@@ -63,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         name: 'Guest Volunteer',
         role: 'donor',
         avatarInitials: 'GV',
-        location: 'Pune',
+        location: getLocalProfileLocation(),
         createdAt: new Date().toISOString(),
         is_anonymous: true,
       })
@@ -118,7 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           name: email.split('@')[0],
           role: 'donor',
           avatarInitials: email.slice(0, 2).toUpperCase(),
-          location: 'Pune',
+          location: getLocalProfileLocation(),
           createdAt: new Date().toISOString(),
           is_anonymous: false,
         }
@@ -153,7 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           name: fullName || email.split('@')[0],
           role: 'donor',
           avatarInitials: (fullName || email).slice(0, 2).toUpperCase(),
-          location: 'Pune',
+          location: getLocalProfileLocation(),
           createdAt: new Date().toISOString(),
           is_anonymous: false,
         }
@@ -182,7 +197,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             name: fullName || email.split('@')[0],
             role: 'donor',
             avatarInitials: (fullName || email).slice(0, 2).toUpperCase(),
-            location: 'Pune',
+            location: getLocalProfileLocation(),
             createdAt: new Date().toISOString(),
             is_anonymous: false,
           }
@@ -278,6 +293,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user])
 
+  const updateLocation = useCallback(async (locationStr: string) => {
+    const cleaned = locationStr.trim()
+    try {
+      if (!user) return { error: new Error('User not authenticated') }
+
+      // 1. Persist to user-scoped localStorage for fast local reloads
+      try {
+        if (cleaned) {
+          localStorage.setItem(`relieflink_profile_location_${user.id}`, cleaned)
+          localStorage.setItem('relieflink_profile_location', cleaned)
+        } else {
+          localStorage.removeItem(`relieflink_profile_location_${user.id}`)
+          localStorage.removeItem('relieflink_profile_location')
+        }
+      } catch {}
+
+      // 2. Persist to auth user metadata if Supabase is configured
+      if (isSupabaseConfigured) {
+        try {
+          await supabase.auth.updateUser({ data: { location: cleaned } })
+        } catch (e) {
+          console.warn('Could not update location in auth metadata:', e)
+        }
+
+        // 3. Also try updating profiles table if column exists in the future
+        try {
+          await supabase
+            .from('profiles')
+            .update({ location: cleaned, updated_at: new Date().toISOString() })
+            .eq('id', user.id)
+        } catch {}
+      }
+
+      // 4. Update local user state
+      setUser(prev => prev ? { ...prev, location: cleaned || undefined } : null)
+      return { error: null }
+    } catch (err: any) {
+      console.error('Failed to update location:', err)
+      return { error: err }
+    }
+  }, [user])
+
   const signOut = useCallback(async () => {
     if (isSupabaseConfigured) {
       await supabase.auth.signOut()
@@ -295,7 +352,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         name: 'Guest Volunteer',
         role: 'donor',
         avatarInitials: 'GV',
-        location: 'Pune',
+        location: getLocalProfileLocation(),
         createdAt: new Date().toISOString(),
         is_anonymous: true,
       })
@@ -313,6 +370,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signUp,
         upgradeAccount,
         updateContactPhone,
+        updateLocation,
         signOut,
       }}
     >
@@ -333,6 +391,7 @@ export function useAuth() {
       signUp: async () => ({ data: null, error: new Error('AuthProvider not found'), requiresEmailVerification: false }),
       upgradeAccount: async () => ({ error: new Error('AuthProvider not found') }),
       updateContactPhone: async () => ({ error: new Error('AuthProvider not found') }),
+      updateLocation: async () => ({ error: new Error('AuthProvider not found') }),
       signOut: async () => {},
     }
   }

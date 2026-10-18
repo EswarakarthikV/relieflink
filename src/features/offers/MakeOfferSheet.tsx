@@ -403,7 +403,7 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
     <>
       {/* Scrim */}
       <div
-        className="fixed inset-0 z-40 bg-navy-900/75 transition-opacity"
+        className="fixed inset-0 z-[60] bg-navy-900/75 transition-opacity"
         onClick={onClose}
         aria-hidden
       />
@@ -413,15 +413,15 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
         role="dialog"
         aria-modal
         aria-label="Make an offer"
-        className="fixed bottom-0 inset-x-0 z-50 bg-surface rounded-t-[24px] shadow-sheet"
+        className="fixed bottom-0 inset-x-0 z-[70] bg-surface rounded-t-[24px] shadow-sheet flex flex-col max-h-[90dvh] max-w-lg mx-auto overflow-hidden"
       >
         {/* Drag handle */}
-        <div className="w-full flex justify-center pt-3 pb-2">
+        <div className="w-full flex justify-center pt-3 pb-2 shrink-0">
           <div className="w-10 h-1 rounded-full bg-slate-300" />
         </div>
 
         {/* Scrollable content */}
-        <div className="px-5 pt-1 pb-32 flex flex-col gap-5 overflow-y-auto max-h-[85dvh]">
+        <div className="px-5 pt-1 pb-6 flex flex-col gap-5 overflow-y-auto overscroll-contain flex-1">
           {submitted ? (
             /* ── Success state ─────────────────────────────────────── */
             <div className="flex flex-col items-center justify-center py-8 gap-4 text-center">
@@ -868,7 +868,7 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
 
         {/* ── Sticky bottom actions ─────────────────────────────────── */}
         {!submitted && (
-          <div className="absolute bottom-0 left-0 right-0 bg-surface border-t border-slate-200 p-4 pb-safe flex flex-col gap-2 shadow-lg">
+          <div className="shrink-0 bg-surface border-t border-slate-200 p-4 pb-safe flex flex-col gap-2 shadow-lg z-10">
             {isExceeding && (
               <p className="text-caption text-danger font-medium text-center">
                 Exceeds remaining ({maxQty}). Adjust your quantity.

@@ -245,12 +245,12 @@ export function HomePage() {
 
       {/* ── Operational Attention Banner ── */}
       <section className="px-4 py-1">
-        <div className="bg-brand-50 border border-brand-200 rounded-card p-3.5 flex items-center justify-between gap-3 shadow-xs">
-          <div className="flex items-center gap-3">
+        <div className="bg-brand-50 border border-brand-200 rounded-card p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center shrink-0">
               <Sparkles className="w-4 h-4" />
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-caption font-bold text-navy-900 leading-snug">
                 Track your active relief coordination
               </p>
@@ -259,10 +259,14 @@ export function HomePage() {
               </p>
             </div>
           </div>
-          <Link to="/my-activity">
-            <Button size="sm" variant="primary" className="shrink-0 gap-1 text-[12px] py-1.5 px-3">
-              <span>View Activity</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+          <Link to="/my-activity" className="shrink-0 flex items-center self-start sm:self-center">
+            <Button
+              size="sm"
+              variant="primary"
+              rightIcon={<ArrowRight className="w-3.5 h-3.5 shrink-0" />}
+              className="h-9 px-3.5 text-[12px] font-semibold flex items-center justify-center gap-1.5 leading-none"
+            >
+              View Activity
             </Button>
           </Link>
         </div>

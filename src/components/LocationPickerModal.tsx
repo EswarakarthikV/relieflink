@@ -16,7 +16,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 })
 
-const PUNE_COORDS = { lat: 18.5204, lng: 73.8567 }
+const DEFAULT_MAP_COORDS = { lat: 20.5937, lng: 78.9629 }
 
 interface NominatimPlace {
   place_id: number | string
@@ -208,8 +208,8 @@ export function LocationPickerModal({
   initialLng,
 }: LocationPickerModalProps) {
   const [position, setPosition] = useState<{ lat: number; lng: number }>(() => ({
-    lat: initialLat || PUNE_COORDS.lat,
-    lng: initialLng || PUNE_COORDS.lng,
+    lat: initialLat || DEFAULT_MAP_COORDS.lat,
+    lng: initialLng || DEFAULT_MAP_COORDS.lng,
   }))
   const [isConfirming, setIsConfirming] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -228,8 +228,8 @@ export function LocationPickerModal({
   useEffect(() => {
     if (isOpen) {
       setPosition({
-        lat: initialLat || PUNE_COORDS.lat,
-        lng: initialLng || PUNE_COORDS.lng,
+        lat: initialLat || DEFAULT_MAP_COORDS.lat,
+        lng: initialLng || DEFAULT_MAP_COORDS.lng,
       })
       setIsConfirming(false)
       setSearchQuery('')

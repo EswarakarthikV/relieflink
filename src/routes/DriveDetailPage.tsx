@@ -949,10 +949,10 @@ export function DriveDetailPage() {
               size="lg"
               fullWidth
               onClick={() => setIsContributeModalOpen(true)}
+              leftIcon={<Package className="w-5 h-5 shrink-0" />}
               className="bg-brand-600 hover:bg-brand-700 text-white font-semibold py-3 shadow-lg flex items-center justify-center gap-2"
             >
-              <Package className="w-5 h-5" />
-              <span>Contribute supplies to this drive</span>
+              <span className="whitespace-nowrap sm:whitespace-normal">Contribute supplies to this drive</span>
             </Button>
           </div>
         )}
