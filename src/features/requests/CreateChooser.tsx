@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ClipboardList, Truck, ChevronRight, X } from 'lucide-react'
+import { ClipboardList, Truck, ChevronRight, X, Heart } from 'lucide-react'
 
 interface CreateChooserProps {
   isOpen: boolean
@@ -58,7 +58,7 @@ export function CreateChooser({ isOpen, onClose }: CreateChooserProps) {
         </div>
 
         {/* Options */}
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3.5">
           {/* Card A: Request supplies */}
           <button
             type="button"
@@ -79,7 +79,27 @@ export function CreateChooser({ isOpen, onClose }: CreateChooserProps) {
             <ChevronRight className="w-5 h-5 text-ink-muted group-hover:text-brand-600 shrink-0 transition-colors" />
           </button>
 
-          {/* Card B: Start a collection drive */}
+          {/* Card B: Offer supplies (Donations) */}
+          <button
+            type="button"
+            onClick={() => handleSelect('/browse?type=requests&action=donate')}
+            className="w-full text-left bg-surface rounded-card p-4 border border-slate-200 shadow-card hover:shadow-[0_4px_12px_rgba(11,36,71,0.12)] transition-all flex items-center gap-4 group active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:outline-none"
+          >
+            <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+              <Heart className="w-6 h-6" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[16px] font-semibold text-ink leading-snug group-hover:text-emerald-700 transition-colors">
+                Offer supplies
+              </p>
+              <p className="text-caption text-ink-muted mt-0.5 leading-relaxed">
+                Pledge food, water, or medical aid to an existing request
+              </p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-ink-muted group-hover:text-emerald-700 shrink-0 transition-colors" />
+          </button>
+
+          {/* Card C: Start a collection drive */}
           <button
             type="button"
             onClick={() => handleSelect('/drives/create')}

@@ -12,8 +12,16 @@ export interface TrackerOffer {
   quantity_offered: number
   quantity_dispatched: number
   quantity_delivered: number
-  status: 'pending' | 'dispatched' | 'delivered' | 'cancelled' | 'rejected'
+  status: 'pending' | 'accepted' | 'dispatched' | 'delivered' | 'cancelled' | 'rejected'
   message?: string
+  delivery_method?: 'self' | 'courier' | 'pickup'
+  pickup_date?: string
+  pickup_time_window?: string
+  pickup_address?: string
+  pickup_contact?: string
+  pickup_notes?: string
+  pickup_status?: 'pending' | 'accepted' | 'declined' | 'completed' | 'not_applicable'
+  allow_calls?: boolean
   dispatched_at?: string
   delivered_at?: string
   created_at: string
@@ -32,6 +40,7 @@ export const INITIAL_MOCK_OFFERS: TrackerOffer[] = [
     quantity_dispatched: 0,
     quantity_delivered: 0,
     status: 'pending',
+    delivery_method: 'self',
     message: 'Can supply 80 sealed 2L water bottles from Kothrud warehouse.',
     created_at: new Date(Date.now() - 40 * 60_000).toISOString(),
   },
@@ -47,6 +56,7 @@ export const INITIAL_MOCK_OFFERS: TrackerOffer[] = [
     quantity_dispatched: 40,
     quantity_delivered: 0,
     status: 'dispatched',
+    delivery_method: 'courier',
     message: 'Dispatched via truck MH-12-AB-1234.',
     created_at: new Date(Date.now() - 120 * 60_000).toISOString(),
     dispatched_at: new Date(Date.now() - 60 * 60_000).toISOString(),
@@ -63,6 +73,13 @@ export const INITIAL_MOCK_OFFERS: TrackerOffer[] = [
     quantity_dispatched: 20,
     quantity_delivered: 20,
     status: 'delivered',
+    delivery_method: 'pickup',
+    pickup_date: new Date().toISOString().slice(0, 10),
+    pickup_time_window: 'Morning (9 AM - 12 PM)',
+    pickup_address: 'Rotary Center, Law College Road, Pune',
+    pickup_contact: '+91 98220 12345',
+    pickup_status: 'accepted',
+    allow_calls: false,
     message: 'Delivered to Kothrud volunteer reception desk.',
     created_at: new Date(Date.now() - 240 * 60_000).toISOString(),
     delivered_at: new Date(Date.now() - 30 * 60_000).toISOString(),
@@ -71,6 +88,10 @@ export const INITIAL_MOCK_OFFERS: TrackerOffer[] = [
 
 // In-memory mock store for demo/fallback interactions
 let mockOffersStore: TrackerOffer[] = [...INITIAL_MOCK_OFFERS]
+
+export function addMockOffer(offer: TrackerOffer) {
+  mockOffersStore = [offer, ...mockOffersStore]
+}
 
 export function updateMockOfferStatus(
   offerId: string,
@@ -95,29 +116,47 @@ const isValidUUID = (str: string) =>
 export async function fetchOffers(requestId: string): Promise<TrackerOffer[]> {
   if (isSupabaseConfigured && isValidUUID(requestId)) {
     try {
-      // 1. Helper RPC that returns offers for a request ID regardless of who's viewing (bypasses RLS)
+      const { data: authData } = await supabase.auth.getUser()
+      const currentUserId = authData?.user?.id
+
+      // 1. Helper RPC that returns offers for a request ID
       const { data, error } = await supabase.rpc('get_request_offers', {
         p_request_id: requestId,
       })
 
       if (!error && data) {
-        return data.map((row: any): TrackerOffer => ({
-          id: row.id,
-          request_id: requestId,
-          request_item_id: row.request_item_id || '',
-          donor_id: row.donor_id,
-          donor_name: row.donor_name || 'Anonymous Donor',
-          item_name: row.item_name || 'Supply item',
-          unit: row.unit || 'units',
-          quantity_offered: Number(row.quantity_offered) || 0,
-          quantity_dispatched: Number(row.quantity_dispatched) || 0,
-          quantity_delivered: Number(row.quantity_delivered) || 0,
-          status: row.status as TrackerOffer['status'],
-          message: row.message || undefined,
-          dispatched_at: row.dispatched_at || undefined,
-          delivered_at: row.delivered_at || undefined,
-          created_at: row.created_at,
-        }))
+        return data.map((row: any): TrackerOffer => {
+          const allowCalls = row.allow_calls !== false
+          const isDonor = currentUserId && currentUserId === row.donor_id
+          // Privacy protection: if calling is disabled and current user is not the donor, strip contact phone
+          const safePickupContact = allowCalls || isDonor ? (row.pickup_contact || undefined) : undefined
+
+          return {
+            id: row.id,
+            request_id: requestId,
+            request_item_id: row.request_item_id || '',
+            donor_id: row.donor_id,
+            donor_name: row.donor_name || 'Anonymous Donor',
+            item_name: row.item_name || 'Supply item',
+            unit: row.unit || 'units',
+            quantity_offered: Number(row.quantity_offered) || 0,
+            quantity_dispatched: Number(row.quantity_dispatched) || 0,
+            quantity_delivered: Number(row.quantity_delivered) || 0,
+            status: row.status as TrackerOffer['status'],
+            message: row.message || undefined,
+            delivery_method: row.delivery_method || 'self',
+            pickup_date: row.pickup_date || undefined,
+            pickup_time_window: row.pickup_time_window || undefined,
+            pickup_address: row.pickup_address || undefined,
+            pickup_contact: safePickupContact,
+            pickup_notes: row.pickup_notes || undefined,
+            pickup_status: row.pickup_status || undefined,
+            allow_calls: allowCalls,
+            dispatched_at: row.dispatched_at || undefined,
+            delivered_at: row.delivered_at || undefined,
+            created_at: row.created_at,
+          }
+        })
       }
 
       if (error) {
@@ -139,5 +178,97 @@ export function useOffers(requestId: string) {
     enabled: Boolean(requestId),
     refetchOnMount: 'always',
     staleTime: 0,
+  })
+}
+
+export interface UserOfferItem extends TrackerOffer {
+  request_title?: string
+}
+
+export async function fetchUserOffers(donorId?: string): Promise<UserOfferItem[]> {
+  if (isSupabaseConfigured && donorId && isValidUUID(donorId)) {
+    try {
+      const { data, error } = await supabase
+        .from('offers')
+        .select(`
+          id,
+          request_id,
+          request_item_id,
+          donor_id,
+          quantity_offered,
+          quantity_dispatched,
+          quantity_delivered,
+          status,
+          message,
+          delivery_method,
+          pickup_date,
+          pickup_time_window,
+          pickup_address,
+          pickup_contact,
+          pickup_notes,
+          pickup_status,
+          dispatched_at,
+          delivered_at,
+          created_at,
+          requests (
+            id,
+            title
+          ),
+          request_items (
+            item_name,
+            unit
+          ),
+          profiles:donor_id (
+            full_name
+          )
+        `)
+        .eq('donor_id', donorId)
+        .order('created_at', { ascending: false })
+
+      if (!error && data) {
+        return data.map((row: any): UserOfferItem => ({
+          id: row.id,
+          request_id: row.request_id,
+          request_item_id: row.request_item_id || '',
+          donor_id: row.donor_id,
+          donor_name: row.profiles?.full_name || 'You',
+          item_name: row.request_items?.item_name || 'Supply item',
+          unit: row.request_items?.unit || 'units',
+          quantity_offered: Number(row.quantity_offered) || 0,
+          quantity_dispatched: Number(row.quantity_dispatched) || 0,
+          quantity_delivered: Number(row.quantity_delivered) || 0,
+          status: row.status as TrackerOffer['status'],
+          message: row.message || undefined,
+          delivery_method: row.delivery_method || 'self',
+          pickup_date: row.pickup_date || undefined,
+          pickup_time_window: row.pickup_time_window || undefined,
+          pickup_address: row.pickup_address || undefined,
+          pickup_contact: row.pickup_contact || undefined,
+          pickup_notes: row.pickup_notes || undefined,
+          pickup_status: row.pickup_status || undefined,
+          dispatched_at: row.dispatched_at || undefined,
+          delivered_at: row.delivered_at || undefined,
+          created_at: row.created_at,
+          request_title: row.requests?.title || 'Relief Request',
+        }))
+      }
+    } catch (err) {
+      console.warn('Error fetching user offers from Supabase:', err)
+    }
+  }
+
+  // Fallback to mock offers
+  return mockOffersStore.map(o => ({
+    ...o,
+    request_title: o.request_id === 'req-001' ? 'Drinking water for 200 families' : 'Relief Request',
+  }))
+}
+
+export function useUserOffers(donorId?: string) {
+  return useQuery<UserOfferItem[]>({
+    queryKey: ['user_offers', donorId],
+    queryFn: () => fetchUserOffers(donorId),
+    refetchOnMount: 'always',
+    staleTime: 5000,
   })
 }

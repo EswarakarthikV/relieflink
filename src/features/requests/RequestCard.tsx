@@ -10,9 +10,10 @@ interface RequestCardProps {
   request: Request
   className?: string
   trackLink?: boolean
+  onOfferClick?: (request: Request) => void
 }
 
-export function RequestCard({ request, className, trackLink }: RequestCardProps) {
+export function RequestCard({ request, className, trackLink, onOfferClick }: RequestCardProps) {
   const primaryItem = request.items[0]
   const totalCommitted = request.items.reduce((s, i) => s + i.quantityCommitted, 0)
   const totalRequested = request.items.reduce((s, i) => s + i.quantityRequested, 0)
@@ -80,26 +81,41 @@ export function RequestCard({ request, className, trackLink }: RequestCardProps)
       </Link>
 
       {/* Row 5: donor count + CTA */}
-      <div className="flex items-center justify-between pt-1 border-t border-slate-100/80">
+      <div className="flex items-center justify-between pt-1 border-t border-slate-100/80 gap-2">
         <div className="flex items-center gap-1.5 text-caption text-ink-muted">
           <Users className="w-4 h-4" />
           <span>{request.donorCount} donor{request.donorCount !== 1 ? 's' : ''}</span>
         </div>
-        {trackLink ? (
-          <Link
-            to={`/tracker/${request.id}`}
-            className="inline-flex items-center gap-1 text-caption font-semibold text-brand-600 hover:text-blue-700 py-1 px-2.5 rounded bg-brand-50 hover:bg-brand-100 transition-colors"
-          >
-            Track →
-          </Link>
-        ) : (
-          <Link
-            to={`/requests/${request.id}`}
-            className="inline-flex items-center gap-0.5 text-caption font-semibold text-brand-600 hover:text-blue-700 py-1.5 pl-2 pr-0.5 min-h-touch"
-          >
-            View details <ChevronRight className="w-4 h-4" />
-          </Link>
-        )}
+        <div className="flex items-center gap-2">
+          {onOfferClick && request.status === 'open' && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                onOfferClick(request)
+              }}
+              className="inline-flex items-center gap-1 text-caption font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 py-1 px-2.5 rounded transition-colors"
+            >
+              Offer Supplies
+            </button>
+          )}
+          {trackLink ? (
+            <Link
+              to={`/tracker/${request.id}`}
+              className="inline-flex items-center gap-1 text-caption font-semibold text-brand-600 hover:text-blue-700 py-1 px-2.5 rounded bg-brand-50 hover:bg-brand-100 transition-colors"
+            >
+              Track →
+            </Link>
+          ) : (
+            <Link
+              to={`/requests/${request.id}`}
+              className="inline-flex items-center gap-0.5 text-caption font-semibold text-brand-600 hover:text-blue-700 py-1.5 pl-2 pr-0.5 min-h-touch"
+            >
+              View details <ChevronRight className="w-4 h-4" />
+            </Link>
+          )}
+        </div>
       </div>
     </div>
   )

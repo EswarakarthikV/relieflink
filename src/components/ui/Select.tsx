@@ -11,11 +11,13 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label?: string
   error?: string
   options?: SelectOption[]
+  placeholder?: string
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
-  ({ label, error, options, children, className, id, ...rest }, ref) => {
+  ({ label, error, options, placeholder, children, className, id, value, ...rest }, ref) => {
     const selectId = id ?? label?.toLowerCase().replace(/\s+/g, '-')
+    const isPlaceholderActive = value === '' || value === undefined
 
     return (
       <div className="flex flex-col gap-1.5 w-full">
@@ -28,9 +30,11 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           <select
             ref={ref}
             id={selectId}
+            value={value}
             className={cn(
               'w-full h-12 rounded-input bg-surface border border-slate-300 px-3.5 pr-10',
-              'text-body text-ink appearance-none cursor-pointer',
+              'text-body appearance-none cursor-pointer',
+              isPlaceholderActive ? 'text-ink-muted' : 'text-ink font-medium',
               'transition-all focus:outline-none focus:border-brand-600',
               'focus:ring-2 focus:ring-brand-600/20',
               error && 'border-danger focus:border-danger focus:ring-danger/20',
@@ -38,9 +42,14 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             )}
             {...rest}
           >
+            {placeholder && (
+              <option value="" disabled className="text-ink-muted">
+                {placeholder}
+              </option>
+            )}
             {options
               ? options.map(opt => (
-                  <option key={opt.value} value={opt.value}>
+                  <option key={opt.value} value={opt.value} className="text-ink">
                     {opt.label}
                   </option>
                 ))

@@ -115,6 +115,7 @@ export const INITIAL_MOCK_DRIVES: CollectionDrive[] = [
     allow_dropoff: true,
     allow_courier: false,
     require_dropoff: false,
+    allow_calls: false,
     status: 'open',
     created_at: new Date(Date.now() - 12 * 3600_000).toISOString(),
     profiles: {
@@ -193,13 +194,25 @@ const isValidUUID = (str: string) =>
 export async function fetchDrives(): Promise<CollectionDrive[]> {
   if (isSupabaseConfigured) {
     try {
+      const { data: authData } = await supabase.auth.getUser()
+      const currentUserId = authData?.user?.id
+
       const { data, error } = await supabase
         .from('collection_drives')
-        .select('*, profiles:collector_id(id, full_name, phone)')
+        .select('*, profiles:collector_id(id, full_name)')
         .order('departure_date', { ascending: true })
 
       if (!error && data && data.length > 0) {
-        return data as CollectionDrive[]
+        return data.map((d: any) => {
+          const drive = { ...d } as CollectionDrive
+          if (drive.allow_calls === false && (!currentUserId || currentUserId !== drive.collector_id)) {
+            drive.organizer_contact = undefined
+          }
+          if (drive.profiles && (drive.profiles as any).phone) {
+            delete (drive.profiles as any).phone
+          }
+          return drive
+        })
       }
       if (error) {
         console.warn('Error fetching collection drives from Supabase:', error)
@@ -217,14 +230,24 @@ export async function fetchDrive(id: string): Promise<CollectionDrive | null> {
 
   if (isSupabaseConfigured && isValidUUID(id)) {
     try {
+      const { data: authData } = await supabase.auth.getUser()
+      const currentUserId = authData?.user?.id
+
       const { data, error } = await supabase
         .from('collection_drives')
-        .select('*, profiles:collector_id(id, full_name, phone)')
+        .select('*, profiles:collector_id(id, full_name)')
         .eq('id', id)
         .maybeSingle()
 
       if (!error && data) {
-        return { ...(localMatch || {}), ...data } as CollectionDrive
+        const drive = { ...(localMatch || {}), ...data } as CollectionDrive
+        if (drive.allow_calls === false && (!currentUserId || currentUserId !== drive.collector_id)) {
+          drive.organizer_contact = undefined
+        }
+        if (drive.profiles && (drive.profiles as any).phone) {
+          delete (drive.profiles as any).phone
+        }
+        return drive
       }
       if (error) {
         console.warn(`Error fetching drive ${id} from Supabase:`, error)
@@ -269,6 +292,7 @@ export interface CreateDriveInput {
   allowDropoff?: boolean
   allowCourier?: boolean
   requireDropoff?: boolean
+  allowCalls?: boolean
 }
 
 export async function createCollectionDrive(input: CreateDriveInput): Promise<CollectionDrive> {
@@ -285,6 +309,7 @@ export async function createCollectionDrive(input: CreateDriveInput): Promise<Co
     collector_name: input.organizerName?.trim() || 'Community Organizer',
     organizer_name: input.organizerName?.trim() || 'Community Organizer',
     organizer_contact: input.organizerContact?.trim() || '',
+    allow_calls: input.allowCalls !== false,
     title,
     description,
     from_city: fromCity,
@@ -364,14 +389,27 @@ export async function createCollectionDrive(input: CreateDriveInput): Promise<Co
         allow_dropoff: Boolean(input.allowDropoff ?? true),
         allow_courier: Boolean(input.allowCourier ?? false),
         require_dropoff: Boolean(input.requireDropoff ?? false),
+        allow_calls: input.allowCalls !== false,
         status: 'open',
       }
 
-      const { data, error } = await supabase
+      let res = await supabase
         .from('collection_drives')
         .insert(payload)
-        .select('*, profiles:collector_id(id, full_name, phone)')
+        .select('*, profiles:collector_id(id, full_name)')
         .single()
+
+      if (res.error && res.error.message?.includes('allow_calls')) {
+        const payloadWithoutCalls = { ...payload }
+        delete (payloadWithoutCalls as any).allow_calls
+        res = await supabase
+          .from('collection_drives')
+          .insert(payloadWithoutCalls)
+          .select('*, profiles:collector_id(id, full_name)')
+          .single()
+      }
+
+      const { data, error } = res
 
       if (!error && data) {
         const savedDrive = { ...newDrive, ...data, id: data.id }

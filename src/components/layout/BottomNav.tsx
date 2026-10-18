@@ -15,13 +15,25 @@ interface BottomNavProps {
 export function BottomNav({ onCreateClick }: BottomNavProps = {}) {
   const location = useLocation()
 
+  // Active state calculations for bottom navigation items
   const isHomeActive = location.pathname === '/' || location.pathname === '/home'
-  const isBrowseActive = location.pathname === '/browse'
+
+  // Browse includes the main aid feed as well as legacy/nested routes
+  const isBrowseActive =
+    location.pathname === '/browse' ||
+    location.pathname === '/drives' ||
+    location.pathname === '/browse-donations'
+
   const isCreateActive =
     location.pathname === '/create' ||
     location.pathname === '/create-drive' ||
     location.pathname === '/drives/create'
-  const isMyRequestsActive = location.pathname === '/my-requests'
+
+  // My Activity combines user requests, donation offers, and collection drives
+  const isMyActivityActive =
+    location.pathname === '/my-activity' ||
+    location.pathname === '/my-requests'
+
   const isProfileActive = location.pathname === '/profile'
 
   return (
@@ -93,20 +105,20 @@ export function BottomNav({ onCreateClick }: BottomNavProps = {}) {
           </span>
         </button>
 
-        {/* 4. My Requests → links to /my-requests */}
+        {/* 4. My Activity → links to /my-activity */}
         <NavLink
-          to="/my-requests"
+          to="/my-activity"
           className={() =>
             cn(
               'flex flex-col items-center justify-center gap-0.5 min-h-touch min-w-[48px]',
               'flex-1 rounded-input transition-colors',
-              isMyRequestsActive ? 'text-brand-600' : 'text-ink-muted hover:text-ink',
+              isMyActivityActive ? 'text-brand-600' : 'text-ink-muted hover:text-ink',
             )
           }
-          aria-label="My Requests"
+          aria-label="My Activity"
         >
-          <ClipboardList className="w-6 h-6" strokeWidth={isMyRequestsActive ? 2.5 : 1.75} />
-          <span className="text-label font-medium">My Requests</span>
+          <ClipboardList className="w-6 h-6" strokeWidth={isMyActivityActive ? 2.5 : 1.75} />
+          <span className="text-label font-medium">My Activity</span>
         </NavLink>
 
         {/* 5. Profile → links to /profile */}

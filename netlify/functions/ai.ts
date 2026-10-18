@@ -17,7 +17,13 @@ export const config = {
 }
 
 interface AIRequestBody {
-  action: 'normalize-search' | 'enhance-title' | 'enhance-description' | 'match-item'
+  action:
+    | 'normalize-search'
+    | 'enhance-title'
+    | 'enhance-description'
+    | 'match-item'
+    | 'parse-relief-request'
+    | 'parse-collection-drive'
   queryText?: string
   rawTitle?: string
   rawDescription?: string
@@ -26,6 +32,7 @@ interface AIRequestBody {
   category?: string
   donorItem?: string
   requestedItem?: string
+  inputText?: string
 }
 
 const ALLOWED_ACTIONS = new Set([
@@ -33,6 +40,8 @@ const ALLOWED_ACTIONS = new Set([
   'enhance-title',
   'enhance-description',
   'match-item',
+  'parse-relief-request',
+  'parse-collection-drive',
 ])
 
 // In-memory sliding-window IP rate limiter
@@ -152,34 +161,44 @@ async function callGemini(
   apiKey: string,
   jsonMode = true,
 ): Promise<string> {
-  // Use header-based authentication so the API key never appears in the URL or query string
-  const res = await fetch(
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey,
-      },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.2,
-          ...(jsonMode ? { responseMimeType: 'application/json' } : {}),
-        },
-      }),
-    },
-  )
+  const models = ['gemini-2.5-flash', 'gemini-1.5-flash']
+  let lastError: any = new Error('Gemini API call failed')
 
-  if (!res.ok) {
-    const errorText = await res.text().catch(() => '')
-    throw new Error(`Gemini ${res.status}: ${errorText}`)
+  for (const model of models) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey,
+          },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.2,
+              ...(jsonMode ? { responseMimeType: 'application/json' } : {}),
+            },
+          }),
+        },
+      )
+
+      if (!res.ok) {
+        const errorText = await res.text().catch(() => '')
+        lastError = new Error(`Gemini ${res.status}: ${errorText}`)
+        continue
+      }
+
+      const data = await res.json()
+      const content = data?.candidates?.[0]?.content?.parts?.[0]?.text
+      if (content) return content
+    } catch (err) {
+      lastError = err
+    }
   }
 
-  const data = await res.json()
-  const content = data?.candidates?.[0]?.content?.parts?.[0]?.text
-  if (!content) throw new Error('Empty response from Gemini API')
-  return content
+  throw lastError
 }
 
 async function callAI(
@@ -412,7 +431,283 @@ Return ONLY valid JSON, no markdown fences:
     }
   }
 
+  if (action === 'parse-relief-request') {
+    const inputText = (body.inputText || '').trim()
+    if (!inputText) {
+      throw new Error('INPUT_TOO_SHORT: Please provide a description of the situation.')
+    }
+    if (inputText.length > 3000) {
+      throw new Error('INPUT_TOO_LONG: Request description exceeds 3000 characters limit.')
+    }
+
+    const prompt = `You are a disaster relief assistant analyzing a crisis request in India.
+Analyze the following natural language description from a requester and extract structured relief details.
+
+Input text: "${inputText}"
+
+CRITICAL RULES — NEVER VIOLATE:
+1. Suggest a concise, clear title (max 80 chars) summarizing what is needed.
+2. Structure the description professionally: context/situation, specific needs, and access notes if any.
+3. Destination/location: Extract ONLY locations (city, district, area, camp) EXPLICITLY mentioned in the input. If no location is mentioned, return "".
+4. Supply items: Identify specific needed supplies mentioned.
+   - For each item, specify name, category ('Water' | 'Food' | 'Hygiene' | 'Medical' | 'Shelter' | 'Other'), unit ('bottles' | 'kg' | 'kits' | 'liters' | 'packets' | 'units'), and proposed quantity.
+   - If a quantity is mentioned (e.g. '200 bottles', '50 kg', 'for 100 people'), use that quantity. If no quantity is mentioned for an item, suggest a reasonable initial starting quantity (e.g. 50 or 100).
+5. Urgency: Choose 'critical' ONLY if life-threatening emergencies, medical crisis, or severe drowning/starvation is stated. Choose 'high' for flood displacement, heavy rains, or power cuts. Otherwise choose 'medium' or 'low'.
+6. Missing information: List what critical information the user did NOT provide (e.g., 'Contact phone number', 'Exact delivery landmark/address', 'Number of affected individuals').
+7. Never invent facts, incidents, or relief camps not supported by the input.
+
+Return ONLY valid JSON matching this schema:
+{
+  "title": string,
+  "description": string,
+  "location": string,
+  "urgency": "low" | "medium" | "high" | "critical",
+  "items": [
+    { "name": string, "category": string, "unit": string, "quantity": number }
+  ],
+  "missing_info": string[]
+}`
+
+    let result: any = null
+    try {
+      const raw = await callAI(prompt, env, undefined, true)
+      result = cleanJSON(raw, null)
+    } catch (err) {
+      console.warn('[Server AI] Upstream AI failed for parse-relief-request, using heuristic NLP fallback:', err)
+    }
+
+    if (!result || !result.title || !Array.isArray(result.items)) {
+      result = fallbackParseReliefRequest(inputText)
+    }
+
+    return result
+  }
+
+  if (action === 'parse-collection-drive') {
+    const inputText = (body.inputText || '').trim()
+    if (!inputText) {
+      throw new Error('INPUT_TOO_SHORT: Please provide a description of the drive.')
+    }
+    if (inputText.length > 3000) {
+      throw new Error('INPUT_TOO_LONG: Description exceeds 3000 characters limit.')
+    }
+
+    const prompt = `You are a disaster logistics assistant for Indian citizen collection drives.
+Analyze the following natural language description of a citizen relief collection drive.
+
+Input text: "${inputText}"
+
+CRITICAL RULES — NEVER VIOLATE:
+1. Identify the starting/collection location ('from_city').
+2. Identify the destination location ('to_city').
+3. Identify the relief event/purpose ('destination_event', e.g. 'Floods in Chennai', 'Cyclone Relief').
+4. Suggest a clear title (e.g. 'Erode to Chennai Flood Relief Drive').
+5. Suggest a structured description explaining the drive, who is organizing, and where supplies are going.
+6. Identify relevant supply categories and target supply items with realistic target quantities.
+7. NEVER invent affected-person counts, active incidents, relief-camp names, or confirmed requests not mentioned in the input.
+
+Return ONLY valid JSON matching this schema:
+{
+  "title": string,
+  "description": string,
+  "from_city": string,
+  "to_city": string,
+  "destination_event": string,
+  "categories": string[],
+  "target_items": [
+    { "name": string, "unit": string, "target_quantity": number }
+  ],
+  "missing_info": string[]
+}`
+
+    let result: any = null
+    try {
+      const raw = await callAI(prompt, env, undefined, true)
+      result = cleanJSON(raw, null)
+    } catch (err) {
+      console.warn('[Server AI] Upstream AI failed for parse-collection-drive, using heuristic NLP fallback:', err)
+    }
+
+    if (!result || !result.title || !Array.isArray(result.target_items)) {
+      result = fallbackParseCollectionDrive(inputText)
+    }
+
+    return result
+  }
+
   throw new Error(`INVALID_ACTION: Unknown action "${action}"`)
+}
+
+// ----------------------------------------------------------------------------
+// Heuristic Rule-Based Disaster NLP Fallbacks (Zero-Failure Offline Resilience)
+// ----------------------------------------------------------------------------
+
+function fallbackParseReliefRequest(text: string) {
+  const lower = text.toLowerCase()
+  const items: Array<{ name: string; category: string; unit: string; quantity: number }> = []
+
+  // Extract common disaster supplies
+  if (lower.includes('water') || lower.includes('thanni') || lower.includes('pani') || lower.includes('paani') || lower.includes('neer')) {
+    items.push({ name: 'Drinking Water', category: 'Water', unit: 'bottles', quantity: 100 })
+  }
+  if (lower.includes('food') || lower.includes('ration') || lower.includes('khana') || lower.includes('unavu') || lower.includes('saapadu') || lower.includes('biscuit') || lower.includes('rice') || lower.includes('arisi')) {
+    items.push({ name: 'Food & Rations', category: 'Food', unit: 'packets', quantity: 50 })
+  }
+  if (lower.includes('blanket') || lower.includes('kambal') || lower.includes('kambili') || lower.includes('bedsheet') || lower.includes('sheet')) {
+    items.push({ name: 'Warm Blankets', category: 'Shelter', unit: 'units', quantity: 40 })
+  }
+  if (lower.includes('hygiene') || lower.includes('soap') || lower.includes('pad') || lower.includes('sanitary') || lower.includes('toothpaste')) {
+    items.push({ name: 'Hygiene Kits', category: 'Hygiene', unit: 'kits', quantity: 30 })
+  }
+  if (lower.includes('medical') || lower.includes('medicine') || lower.includes('first aid') || lower.includes('dawai') || lower.includes('marundhu') || lower.includes('tablet')) {
+    items.push({ name: 'First Aid & Medicines', category: 'Medical', unit: 'kits', quantity: 20 })
+  }
+  if (lower.includes('tarpaulin') || lower.includes('shelter') || lower.includes('tent') || lower.includes('tirpaal')) {
+    items.push({ name: 'Tarpaulins / Shelter', category: 'Shelter', unit: 'units', quantity: 20 })
+  }
+
+  if (items.length === 0) {
+    items.push({ name: 'Emergency Supplies', category: 'Other', unit: 'units', quantity: 50 })
+  }
+
+  // Location heuristic (common Indian disaster hubs or capitalized patterns)
+  let location = ''
+  const cityMatches = text.match(/\b(Chennai|Erode|Coimbatore|Madurai|Salem|Tirunelveli|Trichy|Thoothukudi|Cuddalore|Kanchipuram|Mumbai|Pune|Kerala|Wayanad|Delhi|Bengaluru|Bangalore|Kolkata)\b/i)
+  if (cityMatches) {
+    location = cityMatches[1]
+  }
+
+  // Urgency heuristic
+  let urgency: 'low' | 'medium' | 'high' | 'critical' = 'medium'
+  if (lower.includes('critical') || lower.includes('trapped') || lower.includes('drowning') || lower.includes('life') || lower.includes('emergency')) {
+    urgency = 'critical'
+  } else if (lower.includes('flood') || lower.includes('urgent') || lower.includes('asap') || lower.includes('heavy rain') || lower.includes('cyclone')) {
+    urgency = 'high'
+  }
+
+  // Missing info check
+  const missing_info: string[] = []
+  if (!location) missing_info.push('Exact delivery location or landmark')
+  if (!text.match(/\d+/)) missing_info.push('Specific counts of affected individuals or families')
+  missing_info.push('Contact phone number for on-ground coordination')
+
+  const titleWords = items.map(i => i.name).slice(0, 3).join(', ')
+  const title = location
+    ? `Emergency ${titleWords} Needed in ${location}`
+    : `Emergency ${titleWords} Needed`
+
+  return {
+    title: title.length > 80 ? title.substring(0, 77) + '...' : title,
+    description: `Situation: ${text.trim()}\n\nRequired immediate relief: ${items.map(i => `${i.quantity} ${i.unit} of ${i.name}`).join(', ')}.`,
+    location,
+    urgency,
+    items,
+    missing_info,
+  }
+}
+
+function fallbackParseCollectionDrive(text: string) {
+  const lower = text.toLowerCase()
+
+  // Known city extraction (prioritize known hubs like Erode, Chennai, etc.)
+  let from_city = ''
+  let to_city = ''
+  const knownCities = [
+    'Chennai', 'Erode', 'Coimbatore', 'Madurai', 'Salem', 'Tirunelveli',
+    'Trichy', 'Thoothukudi', 'Cuddalore', 'Kanchipuram', 'Mumbai', 'Pune',
+    'Kerala', 'Wayanad', 'Delhi', 'Bengaluru', 'Bangalore', 'Kolkata'
+  ]
+  const foundKnown: string[] = []
+  for (const c of knownCities) {
+    const rx = new RegExp(`\\b${c}\\b`, 'i')
+    if (rx.test(text)) {
+      foundKnown.push(c)
+    }
+  }
+
+  if (foundKnown.length >= 2) {
+    // Determine order from text
+    const idx0 = text.toLowerCase().indexOf(foundKnown[0].toLowerCase())
+    const idx1 = text.toLowerCase().indexOf(foundKnown[1].toLowerCase())
+    if (idx0 <= idx1) {
+      from_city = foundKnown[0]
+      to_city = foundKnown[1]
+    } else {
+      from_city = foundKnown[1]
+      to_city = foundKnown[0]
+    }
+  } else if (foundKnown.length === 1) {
+    to_city = foundKnown[0]
+  } else {
+    const fromToMatch = text.match(/from\s+([a-zA-Z\s]+?)\s+(?:to|for)\s+([a-zA-Z\s]+?)(?:[,.]|$|\s+to\s+deliver)/i)
+    if (fromToMatch) {
+      from_city = fromToMatch[1].trim()
+      to_city = fromToMatch[2].trim()
+    }
+  }
+
+  // Event
+  let destination_event = 'Disaster Relief'
+  if (lower.includes('flood')) destination_event = 'Flood Relief'
+  else if (lower.includes('cyclone')) destination_event = 'Cyclone Relief'
+  else if (lower.includes('landslide')) destination_event = 'Landslide Relief'
+  else if (lower.includes('rain')) destination_event = 'Heavy Rain Relief'
+
+  // Items
+  const target_items: Array<{ name: string; unit: string; target_quantity: number }> = []
+  const categories: string[] = []
+
+  if (lower.includes('water') || lower.includes('thanni') || lower.includes('pani')) {
+    target_items.push({ name: 'Water (Bottles)', unit: 'bottles', target_quantity: 100 })
+    categories.push('Water')
+  }
+  if (lower.includes('food') || lower.includes('ration') || lower.includes('biscuit') || lower.includes('bread')) {
+    target_items.push({ name: 'Food & Rations', unit: 'packs', target_quantity: 100 })
+    categories.push('Food')
+  }
+  if (lower.includes('blanket') || lower.includes('kambal') || lower.includes('kambili') || lower.includes('sheet')) {
+    target_items.push({ name: 'Warm Blankets', unit: 'pieces', target_quantity: 50 })
+    categories.push('Blankets')
+  }
+  if (lower.includes('hygiene') || lower.includes('soap') || lower.includes('pad') || lower.includes('sanitary')) {
+    target_items.push({ name: 'Hygiene Kits', unit: 'kits', target_quantity: 50 })
+    categories.push('Hygiene')
+  }
+  if (lower.includes('medical') || lower.includes('medicine') || lower.includes('first aid')) {
+    target_items.push({ name: 'Medical Supplies', unit: 'kits', target_quantity: 30 })
+    categories.push('Medical')
+  }
+
+  if (target_items.length === 0) {
+    target_items.push(
+      { name: 'Water (Bottles)', unit: 'bottles', target_quantity: 100 },
+      { name: 'Food & Rations', unit: 'packs', target_quantity: 100 },
+      { name: 'Warm Blankets', unit: 'pieces', target_quantity: 50 },
+    )
+    categories.push('Water', 'Food', 'Blankets')
+  }
+
+  const title = from_city && to_city
+    ? `${from_city} to ${to_city} ${destination_event}`
+    : to_city
+      ? `${to_city} Community ${destination_event}`
+      : `Citizen Community ${destination_event}`
+
+  const missing_info: string[] = []
+  if (!from_city) missing_info.push('Collection starting city')
+  if (!to_city) missing_info.push('Destination city')
+  missing_info.push('Specific collection center address and departure date')
+
+  return {
+    title,
+    description: `Community collection drive: ${text.trim()}\n\nCollecting essential relief supplies for distribution to affected families.`,
+    from_city,
+    to_city,
+    destination_event: to_city ? `${to_city} ${destination_event}` : destination_event,
+    categories,
+    target_items,
+    missing_info,
+  }
 }
 
 // Netlify Functions v2 handler

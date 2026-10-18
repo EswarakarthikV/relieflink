@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { MapPin, Clock, Users, AlertTriangle, ArrowLeft, Phone, Lock } from 'lucide-react'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { MapPin, Clock, Users, AlertTriangle, ArrowLeft, Phone, PhoneOff, Lock, Shield } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
 import { TopBar } from '@/components/layout/TopBar'
 import { UrgencyBadge, StatusBadge } from '@/components/ui/Badge'
@@ -17,11 +17,18 @@ import type { Request } from '@/types'
 export function RequestDetailPage() {
   const { id = '' }    = useParams<{ id: string }>()
   const navigate       = useNavigate()
+  const [searchParams] = useSearchParams()
   const { user }       = useAuth()
   const { data: req, isLoading, isError } = useRequest(id)
   const { data: stats = [] } = useRequestItemStats(id)
-  const { data: contact } = useRequestContact(id)
-  const [offerOpen, setOfferOpen] = useState(false)
+  const { data: contact } = useRequestContact(id, {
+    allowCalls: req?.allow_calls,
+    requesterId: req?.requesterId,
+  })
+
+  // Auto-open offer sheet if routed with ?action=donate or ?offer=true
+  const shouldAutoOpenOffer = searchParams.get('action') === 'donate' || searchParams.get('offer') === 'true'
+  const [offerOpen, setOfferOpen] = useState(shouldAutoOpenOffer)
 
   if (isLoading) return (
     <AppShell>
@@ -210,7 +217,7 @@ export function RequestDetailPage() {
 
           {/* ── Contact Section ─────────────────────────────────────────── */}
           <div className="bg-surface rounded-card border border-slate-200/80 shadow-card p-4 space-y-3">
-            <h2 className="text-h4 font-semibold text-ink">Contact</h2>
+            <h2 className="text-h4 font-semibold text-ink">Coordinator Contact</h2>
 
             {contact ? (
               <div className="space-y-3">
@@ -219,25 +226,35 @@ export function RequestDetailPage() {
                     <Phone className="w-5 h-5 text-brand-600" />
                   </div>
                   <div className="min-w-0">
-                    <span className="text-[13px] text-ink-muted uppercase font-semibold tracking-wider block">
-                      Contact on delivery
+                    <span className="text-[12px] text-brand-700 bg-brand-50 border border-brand-200/70 px-2 py-0.5 rounded font-semibold uppercase tracking-wider inline-block">
+                      Delivery Coordinator
                     </span>
-                    <p className="text-[16px] font-semibold text-navy-900 truncate">
+                    <p className="text-[16px] font-semibold text-navy-900 truncate mt-0.5">
                       {contact.contact_name}
-                    </p>
-                    <p className="text-[14px] text-ink-muted">
-                      {contact.contact_phone}
                     </p>
                   </div>
                 </div>
 
-                <a
-                  href={`tel:${contact.contact_phone}`}
-                  className="w-full h-[44px] rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-medium text-body flex items-center justify-center gap-2 transition-colors active:scale-[0.99] shadow-sm select-none"
-                >
-                  <Phone className="w-4 h-4" />
-                  <span>Call {contact.contact_name}</span>
-                </a>
+                {req.allow_calls !== false ? (
+                  <div className="space-y-1.5">
+                    <a
+                      href={`tel:${contact.contact_phone}`}
+                      className="w-full h-[44px] rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-medium text-body flex items-center justify-center gap-2 transition-colors active:scale-[0.99] shadow-sm select-none"
+                    >
+                      <Phone className="w-4 h-4" />
+                      <span>Call Coordinator ({contact.contact_name})</span>
+                    </a>
+                    <p className="text-[11px] text-ink-muted text-center flex items-center justify-center gap-1">
+                      <Shield className="w-3 h-3 text-brand-600" />
+                      Opens phone dialer directly · Phone number protected
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2.5 p-3 rounded-lg bg-slate-50 border border-slate-200/80 text-ink-muted text-caption">
+                    <PhoneOff className="w-4 h-4 text-ink-muted shrink-0" />
+                    <span>Direct calling is disabled by the coordinator. Coordination is managed through in-app delivery tracking.</span>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="flex items-center gap-2.5 p-3 rounded-lg bg-slate-50 border border-slate-200/80 text-ink-muted text-caption">

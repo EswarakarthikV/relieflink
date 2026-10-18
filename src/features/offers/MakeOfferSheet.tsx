@@ -1,11 +1,13 @@
-import { useState, useEffect } from 'react'
-import { X, Minus, Plus, Info, CheckCircle, AlertTriangle } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { X, Minus, Plus, Info, CheckCircle, AlertTriangle, Calendar, MapPin, Phone, PhoneOff, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Toast } from '@/components/ui/Toast'
-import { Textarea } from '@/components/ui/Input'
+import { Input, Textarea } from '@/components/ui/Input'
 import { useCreateOffer, useRequestItemStats } from '@/hooks/useRequests'
 import { useAuth } from '@/hooks/useAuth'
+import { addMockOffer } from '@/hooks/useOffers'
+import { addNotification } from '@/hooks/useNotifications'
 import { fmtNumber, fmtPercent, fulfillmentRatio } from '@/utils/format'
 import { cn } from '@/utils/cn'
 import type { Request, DeliveryMethod, SupplyItem } from '@/types'
@@ -20,8 +22,9 @@ interface MakeOfferSheetProps {
 }
 
 const DELIVERY_OPTIONS: { value: DeliveryMethod; label: string; sub: string }[] = [
-  { value: 'self',    label: 'I will deliver myself',       sub: 'Drop directly at the aid station' },
-  { value: 'courier', label: 'I will ship via courier',     sub: 'Provide tracking details post submission' },
+  { value: 'self',    label: 'I will deliver myself',       sub: 'Drop directly at the aid station / hub' },
+  { value: 'pickup',  label: 'Arrange organizer pickup',    sub: 'Request the relief coordinator to collect supplies from you' },
+  { value: 'courier', label: 'I will ship via courier',     sub: 'Provide shipment tracking details post submission' },
 ]
 
 export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps) {
@@ -59,6 +62,27 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [toastVariant, setToastVariant] = useState<'success' | 'warning' | 'danger'>('warning')
 
+  // Fulfilment & Pickup Form State
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+  const [pickupDate, setPickupDate] = useState(tomorrow)
+  const [pickupTimeWindow, setPickupTimeWindow] = useState('Morning (9 AM - 12 PM)')
+  const [pickupAddress, setPickupAddress] = useState('')
+  const [pickupContact, setPickupContact] = useState('')
+  const [pickupNotes, setPickupNotes] = useState('')
+  const [allowCalls, setAllowCalls] = useState(true)
+  const [pickupErrors, setPickupErrors] = useState<{ address?: string; contact?: string }>({})
+
+  // Snapshot of submitted commitment to prevent state overwrites
+  const [submittedOffer, setSubmittedOffer] = useState<{
+    quantity: number
+    unit: string
+    itemName: string
+    deliveryMethod: DeliveryMethod
+    pickupDate?: string
+    pickupTimeWindow?: string
+    pickupAddress?: string
+  } | null>(null)
+
   const showToast = (msg: string, variant: 'success' | 'warning' | 'danger' = 'warning') => {
     setToastMessage(msg)
     setToastVariant(variant)
@@ -69,16 +93,30 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
 
   const isExceeding = qty > maxQty
 
-  // Reset state and force refetch when sheet opens
+  // Ref to track if modal was already opened, preventing query invalidation from resetting user input or success view
+  const prevIsOpenRef = useRef(false)
+  const userEnteredQtyRef = useRef(false)
+
+  // Reset state ONLY when sheet transitions from closed to open
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !prevIsOpenRef.current) {
+      prevIsOpenRef.current = true
+      userEnteredQtyRef.current = false
       setIsRefetchingStats(true)
       const first = request.items[0]
       setSelectedItem(first)
       setDelivery('self')
       setMessage('')
+      setPickupDate(new Date(Date.now() + 86400000).toISOString().slice(0, 10))
+      setPickupTimeWindow('Morning (9 AM - 12 PM)')
+      setPickupAddress('')
+      setPickupContact(user?.phone || '')
+      setPickupNotes('')
+      setAllowCalls(true)
+      setPickupErrors({})
       setConfirmed(true)
       setSubmitted(false)
+      setSubmittedOffer(null)
       setIsSubmitting(false)
       setQtyError('')
       setSubmitError(null)
@@ -92,27 +130,33 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
       ])
         .then(async () => {
           const { data: freshStats } = await refetchStats()
-          const targetItem =
-            (freshStats &&
-              request.items.find(it => {
-                const s = freshStats.find((st: any) => st.request_item_id === it.id)
-                return s && s.quantity_remaining > 0
-              })) ||
-            request.items.find(it => (it.quantityRequested - it.quantityCommitted) > 0) ||
-            request.items[0]
+          // Only update selected item and default quantity if user has not already entered their own quantity!
+          if (!userEnteredQtyRef.current) {
+            const targetItem =
+              (freshStats &&
+                request.items.find(it => {
+                  const s = freshStats.find((st: any) => st.request_item_id === it.id)
+                  return s && s.quantity_remaining > 0
+                })) ||
+              request.items.find(it => (it.quantityRequested - it.quantityCommitted) > 0) ||
+              request.items[0]
 
-          if (targetItem) {
-            setSelectedItem(targetItem)
-            const stat = freshStats?.find((s: any) => s.request_item_id === targetItem.id)
-            const freshMax = stat
-              ? stat.quantity_remaining
-              : Math.max(0, targetItem.quantityRequested - targetItem.quantityCommitted)
-            setQty(freshMax > 0 ? Math.min(20, freshMax) : 0)
+            if (targetItem) {
+              setSelectedItem(targetItem)
+              const stat = freshStats?.find((s: any) => s.request_item_id === targetItem.id)
+              const freshMax = stat
+                ? stat.quantity_remaining
+                : Math.max(0, targetItem.quantityRequested - targetItem.quantityCommitted)
+              setQty(freshMax > 0 ? Math.min(20, freshMax) : 0)
+            }
           }
         })
         .finally(() => {
           setIsRefetchingStats(false)
         })
+    } else if (!isOpen) {
+      prevIsOpenRef.current = false
+      userEnteredQtyRef.current = false
     }
   }, [isOpen, request.id, refetchStats, request.items])
 
@@ -132,6 +176,7 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
   }
 
   const changeQty = (delta: number) => {
+    userEnteredQtyRef.current = true
     const next = qty + delta
     if (next < 1) {
       setQtyError('Minimum is 1')
@@ -147,6 +192,7 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
   }
 
   const handleSubmit = async () => {
+    userEnteredQtyRef.current = true
     if (!confirmed) {
       setQtyError('Please confirm your commitment first')
       return
@@ -160,13 +206,32 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
 
     setIsSubmitting(true)
     setSubmitError(null)
+    setPickupErrors({})
+
+    const finalQty = Number(qty)
+
+    // Validate pickup arrangement if selected
+    if (delivery === 'pickup') {
+      const pErrors: { address?: string; contact?: string } = {}
+      if (!pickupAddress.trim()) {
+        pErrors.address = 'Please enter collection point / address'
+      }
+      if (!pickupContact.trim()) {
+        pErrors.contact = 'Please enter donor contact phone'
+      }
+      if (Object.keys(pErrors).length > 0) {
+        setPickupErrors(pErrors)
+        setIsSubmitting(false)
+        return
+      }
+    }
 
     try {
       const isValidUUID = (str: string) =>
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)
 
-      // Call Supabase RPC create_offer if configured and item is a valid UUID
-      if (isSupabaseConfigured && isValidUUID(selectedItem.id)) {
+      // Call Supabase RPC create_offer if configured and both request and item are valid UUIDs
+      if (isSupabaseConfigured && isValidUUID(request.id) && isValidUUID(selectedItem.id)) {
         // Ensure active session
         const { data: { session } } = await supabase.auth.getSession()
         if (!session) {
@@ -174,14 +239,35 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
           if (anonError) throw new Error('Anonymous sign-in failed: ' + anonError.message)
         }
 
-        const { error: rpcError } = await supabase.rpc('create_offer', {
-          p_item_id: selectedItem.id,
-          p_qty: qty,
-          p_msg: message || null,
-        })
+        // Try updated RPC with pickup parameters first
+        let rpcError: any = null
+        try {
+          const res = await supabase.rpc('create_offer', {
+            p_item_id: selectedItem.id,
+            p_qty: finalQty,
+            p_msg: message || null,
+            p_delivery_method: delivery,
+            p_pickup_date: delivery === 'pickup' ? pickupDate : null,
+            p_pickup_time: delivery === 'pickup' ? pickupTimeWindow : null,
+            p_pickup_address: delivery === 'pickup' ? pickupAddress.trim() : null,
+            p_pickup_contact: delivery === 'pickup' ? pickupContact.trim() : null,
+            p_pickup_notes: delivery === 'pickup' ? (pickupNotes.trim() || null) : null,
+          })
+          rpcError = res.error
+        } catch {
+          rpcError = { message: 'RPC signature mismatch' }
+        }
 
+        // If migration 008 is not yet executed remotely, gracefully fallback to 3-parameter RPC
         if (rpcError) {
-          throw new Error(rpcError.message || 'Failed to submit offer via Supabase')
+          const { error: fallbackError } = await supabase.rpc('create_offer', {
+            p_item_id: selectedItem.id,
+            p_qty: finalQty,
+            p_msg: message || null,
+          })
+          if (fallbackError) {
+            throw new Error(fallbackError.message || 'Failed to submit offer via Supabase')
+          }
         }
 
         // Invalidate queries so stats and request metrics refresh immediately
@@ -189,6 +275,31 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
         queryClient.invalidateQueries({ queryKey: ['request', request.id] })
         queryClient.invalidateQueries({ queryKey: ['requests'] })
       }
+
+      // Record in local mock store for reliable fallback and testing
+      addMockOffer({
+        id: `offer-${Date.now()}`,
+        request_id: request.id,
+        request_item_id: selectedItem.id,
+        donor_id: user?.id ?? 'anon-donor',
+        donor_name: user?.name ?? 'Volunteer',
+        item_name: selectedItem.name,
+        unit: selectedItem.unit,
+        quantity_offered: finalQty,
+        quantity_dispatched: 0,
+        quantity_delivered: 0,
+        status: 'pending',
+        delivery_method: delivery,
+        pickup_date: delivery === 'pickup' ? pickupDate : undefined,
+        pickup_time_window: delivery === 'pickup' ? pickupTimeWindow : undefined,
+        pickup_address: delivery === 'pickup' ? pickupAddress.trim() : undefined,
+        pickup_contact: delivery === 'pickup' ? pickupContact.trim() : undefined,
+        pickup_notes: delivery === 'pickup' ? pickupNotes.trim() : undefined,
+        pickup_status: delivery === 'pickup' ? 'pending' : 'not_applicable',
+        allow_calls: allowCalls,
+        message: message || undefined,
+        created_at: new Date().toISOString(),
+      })
 
       // Also trigger mutation to update local React Query cache
       await createOffer.mutateAsync({
@@ -198,16 +309,32 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
         donorName: user?.name ?? 'Volunteer',
         itemName: selectedItem.name,
         unit: selectedItem.unit,
-        quantityOffered: qty,
+        quantityOffered: finalQty,
         deliveryMethod: delivery,
+        pickupDate: delivery === 'pickup' ? pickupDate : undefined,
+        pickupTimeWindow: delivery === 'pickup' ? pickupTimeWindow : undefined,
+        pickupAddress: delivery === 'pickup' ? pickupAddress.trim() : undefined,
+        pickupContact: delivery === 'pickup' ? pickupContact.trim() : undefined,
+        pickupNotes: delivery === 'pickup' ? pickupNotes.trim() : undefined,
+        pickupStatus: delivery === 'pickup' ? 'pending' : 'not_applicable',
+        allow_calls: allowCalls,
         earliestDate: new Date(Date.now() + 3 * 86_400_000).toISOString(),
         message,
+      })
+
+      // Add in-app confirmation notification for donor
+      addNotification({
+        type: 'offer_received',
+        title: 'Offer Submitted',
+        body: `Your commitment of ${finalQty} ${selectedItem.unit} for "${request.title}" has been recorded.${delivery === 'pickup' ? ' (Pickup requested)' : ''}`,
+        relatedRequestId: request.id,
       })
 
       // Invalidate again to ensure fresh data
       queryClient.invalidateQueries({ queryKey: ['request_item_stats'] })
       queryClient.invalidateQueries({ queryKey: ['request', request.id] })
       queryClient.invalidateQueries({ queryKey: ['requests'] })
+      queryClient.invalidateQueries({ queryKey: ['request_offers', request.id] })
 
       // Dispatch real-time push notification to the requester
       if (request.requesterId) {
@@ -215,13 +342,23 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
           event: 'offer_created',
           recipientUserId: request.requesterId,
           title: 'New Supply Offer Received',
-          body: `A donor offered ${qty} ${selectedItem.unit} of "${selectedItem.name}" for "${request.title}".`,
+          body: `A donor offered ${finalQty} ${selectedItem.unit} of "${selectedItem.name}" for "${request.title}".`,
           url: `/requests/${request.id}`,
           tag: `relieflink-offer-${request.id}`,
-          idempotencyKey: `client-offer-${request.id}-${selectedItem.id}-${qty}`,
+          idempotencyKey: `client-offer-${request.id}-${selectedItem.id}-${finalQty}`,
         }).catch(() => {})
       }
 
+      // Persist snapshot of successfully saved commitment
+      setSubmittedOffer({
+        quantity: finalQty,
+        unit: selectedItem.unit,
+        itemName: selectedItem.name,
+        deliveryMethod: delivery,
+        pickupDate: delivery === 'pickup' ? pickupDate : undefined,
+        pickupTimeWindow: delivery === 'pickup' ? pickupTimeWindow : undefined,
+        pickupAddress: delivery === 'pickup' ? pickupAddress.trim() : undefined,
+      })
       setSubmitted(true)
     } catch (err: any) {
       const errorMsg = err?.message || ''
@@ -245,7 +382,6 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
           setQty(safeRemaining > 0 ? safeRemaining : 0)
         }
 
-        // Refetch the stats query so the progress bar corrects
         queryClient.invalidateQueries({ queryKey: ['request_item_stats'] })
         queryClient.invalidateQueries({ queryKey: ['request', request.id] })
         refetchStats()
@@ -262,7 +398,6 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
   const committed = selectedStat ? selectedStat.quantity_committed : selectedItem?.quantityCommitted || 0
   const requested = selectedStat ? selectedStat.quantity_needed : selectedItem?.quantityRequested || 0
   const ratio = requested > 0 ? fulfillmentRatio(committed, requested) : 0
-
 
   return (
     <>
@@ -289,18 +424,46 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
         <div className="px-5 pt-1 pb-32 flex flex-col gap-5 overflow-y-auto max-h-[85dvh]">
           {submitted ? (
             /* ── Success state ─────────────────────────────────────── */
-            <div className="flex flex-col items-center justify-center py-10 gap-4 text-center">
+            <div className="flex flex-col items-center justify-center py-8 gap-4 text-center">
               <div className="w-16 h-16 rounded-full bg-success-bg flex items-center justify-center">
                 <CheckCircle className="w-8 h-8 text-success" />
               </div>
-              <div>
+              <div className="space-y-2">
                 <h2 className="text-h2 font-semibold text-ink">Offer submitted!</h2>
-                <p className="text-caption text-ink-muted mt-1">
-                  Your commitment of {fmtNumber(qty)} {selectedItem?.unit} has been recorded.
+                <p className="text-body text-ink leading-relaxed">
+                  Your commitment of{' '}
+                  <strong className="text-brand-600 font-bold">
+                    {fmtNumber(submittedOffer?.quantity ?? qty)} {submittedOffer?.unit ?? selectedItem?.unit}
+                  </strong>{' '}
+                  has been recorded.
                 </p>
+                <div className="bg-slate-50 border border-slate-200 rounded-card p-3 text-caption text-ink-muted text-left space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-ink">Fulfilment Method:</span>
+                    <span className="capitalize font-medium text-navy-900">
+                      {submittedOffer?.deliveryMethod === 'pickup'
+                        ? 'Organizer Pickup'
+                        : submittedOffer?.deliveryMethod === 'courier'
+                        ? 'Courier Shipment'
+                        : 'Self Delivery'}
+                    </span>
+                  </div>
+                  {submittedOffer?.deliveryMethod === 'pickup' && (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <span>Pickup Date:</span>
+                        <span className="text-ink font-medium">{submittedOffer.pickupDate} ({submittedOffer.pickupTimeWindow})</span>
+                      </div>
+                      <div className="flex items-start justify-between gap-2 pt-0.5">
+                        <span className="shrink-0">Location:</span>
+                        <span className="text-ink font-medium text-right truncate">{submittedOffer.pickupAddress}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
-              <Button variant="secondary" onClick={onClose}>
-                Close
+              <Button variant="primary" onClick={onClose} className="w-full max-w-xs mt-2">
+                Done
               </Button>
             </div>
           ) : (
@@ -435,9 +598,25 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
                     </button>
 
                     <div className="flex flex-col items-center min-w-[120px]">
-                      <span className="text-[40px] leading-none font-bold text-ink tracking-tight tnum">
-                        {qty}
-                      </span>
+                      <input
+                        type="number"
+                        id="offer-qty-input"
+                        aria-label="Quantity to provide"
+                        min="1"
+                        max={maxQty}
+                        value={qty || ''}
+                        onChange={e => {
+                          userEnteredQtyRef.current = true
+                          const val = parseInt(e.target.value, 10)
+                          if (!isNaN(val)) {
+                            setQty(Math.min(maxQty, Math.max(1, val)))
+                            setQtyError('')
+                          } else if (e.target.value === '') {
+                            setQty(0)
+                          }
+                        }}
+                        className="text-[36px] leading-none font-bold text-ink tracking-tight tnum w-28 text-center bg-transparent border-b border-slate-200 hover:border-slate-300 focus:border-brand-600 outline-none transition-colors"
+                      />
                       <span className="text-caption text-ink-muted mt-1 uppercase tracking-wider">
                         {selectedItem?.unit ?? 'Units'}
                       </span>
@@ -462,6 +641,7 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
                           key={n}
                           type="button"
                           onClick={() => {
+                            userEnteredQtyRef.current = true
                             setQty(n)
                             setQtyError('')
                           }}
@@ -476,6 +656,7 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
                     <button
                       type="button"
                       onClick={() => {
+                        userEnteredQtyRef.current = true
                         setQty(maxQty)
                         setQtyError('')
                       }}
@@ -521,7 +702,10 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
                         name="delivery_method"
                         value={opt.value}
                         checked={delivery === opt.value}
-                        onChange={() => setDelivery(opt.value)}
+                        onChange={() => {
+                          setDelivery(opt.value)
+                          setPickupErrors({})
+                        }}
                         className="w-4 h-4 text-brand-600 accent-brand-600"
                       />
                       <div className="flex flex-col">
@@ -531,6 +715,122 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
                     </label>
                   ))}
                 </div>
+
+                {/* ── Pickup Details Sub-form ── */}
+                {delivery === 'pickup' && (
+                  <div className="bg-brand-50/70 border border-brand-200 rounded-card p-4 space-y-3 mt-1 animate-in fade-in duration-200">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center shrink-0">
+                        <MapPin className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-body font-semibold text-navy-900 leading-tight">Pickup Arrangement Details</h4>
+                        <p className="text-[12px] text-ink-muted">The relief team will coordinate pickup from this location</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[12px] font-semibold text-ink block mb-1">Proposed Pickup Date</label>
+                        <Input
+                          type="date"
+                          min={new Date().toISOString().slice(0, 10)}
+                          value={pickupDate}
+                          onChange={e => setPickupDate(e.target.value)}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[12px] font-semibold text-ink block mb-1">Time Window</label>
+                        <select
+                          value={pickupTimeWindow}
+                          onChange={e => setPickupTimeWindow(e.target.value)}
+                          className="w-full h-11 px-3 rounded-input border border-slate-300 bg-surface text-body font-medium text-ink focus:outline-none focus:ring-2 focus:ring-brand-600"
+                        >
+                          <option value="Morning (9 AM - 12 PM)">Morning (9 AM - 12 PM)</option>
+                          <option value="Afternoon (12 PM - 4 PM)">Afternoon (12 PM - 4 PM)</option>
+                          <option value="Evening (4 PM - 8 PM)">Evening (4 PM - 8 PM)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Input
+                        label="Pickup Address / Collection Point"
+                        placeholder="e.g. 102 Green Heights, M.G. Road, Pune"
+                        value={pickupAddress}
+                        onChange={e => {
+                          setPickupAddress(e.target.value)
+                          if (pickupErrors.address) setPickupErrors(p => ({ ...p, address: undefined }))
+                        }}
+                        error={pickupErrors.address}
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-caption font-semibold text-ink">
+                          Donor Contact Phone *
+                        </label>
+                        {user?.phone && pickupContact === user.phone && (
+                          <span className="text-[11px] font-semibold text-brand-600 bg-brand-50 border border-brand-200 px-2 py-0.5 rounded-pill">
+                            Prefilled from profile
+                          </span>
+                        )}
+                      </div>
+                      <Input
+                        placeholder="+91 98765 43210"
+                        type="tel"
+                        value={pickupContact}
+                        onChange={e => {
+                          setPickupContact(e.target.value)
+                          if (pickupErrors.contact) setPickupErrors(p => ({ ...p, contact: undefined }))
+                        }}
+                        error={pickupErrors.contact}
+                        required
+                      />
+
+                      {/* Owner-controlled call button toggle for donor */}
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200/80 mt-1">
+                        <div className="space-y-0.5 pr-2">
+                          <div className="flex items-center gap-1.5">
+                            {allowCalls ? (
+                              <Phone className="w-3.5 h-3.5 text-brand-600" />
+                            ) : (
+                              <PhoneOff className="w-3.5 h-3.5 text-ink-muted" />
+                            )}
+                            <span className="text-body font-semibold text-navy-900">
+                              Allow Coordinator to Call
+                            </span>
+                          </div>
+                          <p className="text-[12px] text-ink-muted leading-relaxed">
+                            {allowCalls
+                              ? 'Coordinator can tap "Call Donor" to coordinate pickup arrival. Your raw digits are protected.'
+                              : 'Call button will be hidden. Coordinator will follow written pickup notes.'}
+                          </p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          id="offer-allow-calls-toggle"
+                          checked={allowCalls}
+                          onChange={e => setAllowCalls(e.target.checked)}
+                          className="w-5 h-5 text-brand-600 rounded border-slate-300 focus:ring-brand-600 cursor-pointer shrink-0"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Textarea
+                        label="Pickup Instructions / Notes (optional)"
+                        placeholder="e.g. Supplies packaged in 2 boxes, please call upon arrival."
+                        rows={2}
+                        value={pickupNotes}
+                        onChange={e => setPickupNotes(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* ── 5. Message ───────────────────────────────────────── */}

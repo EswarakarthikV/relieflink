@@ -76,15 +76,30 @@ async function run() {
   await donorA.from('profiles').upsert({ id: userA.id, role: 'donor', full_name: 'Donor Alice' })
   await donorB.from('profiles').upsert({ id: userB.id, role: 'donor', full_name: 'Donor Bob' })
 
+  const safeCreateOffer = async (client, itemId, qty, msg) => {
+    return client.rpc('create_offer', {
+      p_item_id: itemId,
+      p_qty: qty,
+      p_msg: msg,
+      p_delivery_method: 'self',
+      p_pickup_date: null,
+      p_pickup_time: null,
+      p_pickup_address: null,
+      p_pickup_contact: null,
+      p_pickup_notes: null,
+    })
+  }
+
   // -------------------------------------------------------------
   // Test Case: Item needs 200 bottles. Donor A offers 120. Donor B attempts 100.
   // -------------------------------------------------------------
   console.log('\n--- Step 1: Donor A offers 120 bottles ---')
-  const { data: offerAId, error: offerAErr } = await donorA.rpc('create_offer', {
-    p_item_id: newItem.id,
-    p_qty: 120,
-    p_msg: 'Donor A supplying 120 bottles'
-  })
+  const { data: offerAId, error: offerAErr } = await safeCreateOffer(
+    donorA,
+    newItem.id,
+    120,
+    'Donor A supplying 120 bottles'
+  )
   if (offerAErr) throw new Error(`Donor A offer failed: ${offerAErr.message}`)
   console.log('Donor A offer created, id:', offerAId)
 
@@ -99,11 +114,12 @@ async function run() {
   }
 
   console.log('\n--- Step 2: Donor B attempts to offer 100 bottles (over remaining 80) ---')
-  const { data: offerB1, error: offerBErr1 } = await donorB.rpc('create_offer', {
-    p_item_id: newItem.id,
-    p_qty: 100,
-    p_msg: 'Donor B attempting 100 bottles'
-  })
+  const { data: offerB1, error: offerBErr1 } = await safeCreateOffer(
+    donorB,
+    newItem.id,
+    100,
+    'Donor B attempting 100 bottles'
+  )
   console.log('Donor B 100 offer result:', { error: offerBErr1?.message })
   if (!offerBErr1 || !offerBErr1.message.includes('EXCEEDS_REMAINING: 80')) {
     throw new Error(`Expected EXCEEDS_REMAINING: 80 error, got ${offerBErr1?.message}`)
@@ -129,18 +145,20 @@ async function run() {
   // Test Case: Donor A offers 80, Donor B offers 30 -> committed 110, remaining 90
   // -------------------------------------------------------------
   console.log('\n--- Step 4: Donor A offers 80, Donor B offers 30 ---')
-  const { data: offerA2, error: errA2 } = await donorA.rpc('create_offer', {
-    p_item_id: newItem.id,
-    p_qty: 80,
-    p_msg: 'Donor A offering 80'
-  })
+  const { data: offerA2, error: errA2 } = await safeCreateOffer(
+    donorA,
+    newItem.id,
+    80,
+    'Donor A offering 80'
+  )
   if (errA2) throw new Error(`Donor A offer 80 failed: ${errA2.message}`)
 
-  const { data: offerB2, error: errB2 } = await donorB.rpc('create_offer', {
-    p_item_id: newItem.id,
-    p_qty: 30,
-    p_msg: 'Donor B offering 30'
-  })
+  const { data: offerB2, error: errB2 } = await safeCreateOffer(
+    donorB,
+    newItem.id,
+    30,
+    'Donor B offering 30'
+  )
   if (errB2) throw new Error(`Donor B offer 30 failed: ${errB2.message}`)
 
   const { data: statsFinal } = await donorA.from('request_item_stats').select('*').eq('request_item_id', newItem.id).single()
@@ -161,8 +179,8 @@ async function run() {
   console.log('\n--- Step 5: Concurrent submissions race condition test ---')
   // Remaining is 90. Suppose Donor A and Donor B simultaneously try to offer 60 each (total 120 > 90).
   const [resA, resB] = await Promise.all([
-    donorA.rpc('create_offer', { p_item_id: newItem.id, p_qty: 60, p_msg: 'Concurrent offer A' }),
-    donorB.rpc('create_offer', { p_item_id: newItem.id, p_qty: 60, p_msg: 'Concurrent offer B' }),
+    safeCreateOffer(donorA, newItem.id, 60, 'Concurrent offer A'),
+    safeCreateOffer(donorB, newItem.id, 60, 'Concurrent offer B'),
   ])
   console.log('Concurrent results:', {
     resA: resA.error?.message || 'Success',
@@ -181,11 +199,12 @@ async function run() {
   const { data: statsBeforeFulfilled } = await donorA.from('request_item_stats').select('*').eq('request_item_id', newItem.id).single()
   const remainingToFulfill = statsBeforeFulfilled.quantity_remaining
   console.log('Offering exact remaining:', remainingToFulfill)
-  const { error: errFulfill } = await donorA.rpc('create_offer', {
-    p_item_id: newItem.id,
-    p_qty: remainingToFulfill,
-    p_msg: 'Exact remaining'
-  })
+  const { error: errFulfill } = await safeCreateOffer(
+    donorA,
+    newItem.id,
+    remainingToFulfill,
+    'Exact remaining'
+  )
   if (errFulfill) throw new Error(`Exact fulfillment offer failed: ${errFulfill.message}`)
 
   const { data: statsFulfilled } = await donorA.from('request_item_stats').select('*').eq('request_item_id', newItem.id).single()

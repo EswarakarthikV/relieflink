@@ -256,21 +256,30 @@ export function useRequestItemStats(requestId: string) {
   return useQuery<RequestItemStat[]>({
     queryKey: ['request_item_stats', requestId],
     queryFn: async () => {
-      if (!isSupabaseConfigured || !requestId) return []
+      if (!requestId) return []
+      const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId)
+      if (!isValidUUID) {
+        const mockReq = MOCK_REQUESTS.find(r => r.id === requestId)
+        if (!mockReq) return []
+        return mockReq.items.map(it => ({
+          request_item_id: it.id,
+          request_id: mockReq.id,
+          item_name: it.name,
+          unit: it.unit,
+          category: it.category.toLowerCase(),
+          quantity_needed: it.quantityRequested,
+          quantity_committed: it.quantityCommitted,
+          quantity_delivered: it.quantityDelivered,
+          quantity_remaining: Math.max(0, it.quantityRequested - it.quantityCommitted),
+        }))
+      }
+
+      if (!isSupabaseConfigured) return []
       try {
-        const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId)
-        let query = supabase.from('request_item_stats').select('*')
-        if (isValidUUID) {
-          query = query.eq('request_id', requestId)
-        } else {
-          const mockReq = MOCK_REQUESTS.find(r => r.id === requestId)
-          const itemIds = mockReq?.items.map(i => i.id).filter(id => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) || []
-          if (itemIds.length > 0) {
-            query = query.in('request_item_id', itemIds)
-          } else {
-            return []
-          }
-        }
+        const query = supabase
+          .from('request_item_stats')
+          .select('*')
+          .eq('request_id', requestId)
 
         const { data, error } = await query
 
@@ -380,12 +389,18 @@ export function useCreateOffer() {
   })
 }
 
-export function useRequestContact(requestId: string) {
+export function useRequestContact(
+  requestId: string,
+  options?: { allowCalls?: boolean; requesterId?: string }
+) {
   return useQuery<RequestContact | null>({
-    queryKey: ['request_contact', requestId],
+    queryKey: ['request_contact', requestId, options?.allowCalls, options?.requesterId],
     queryFn: async () => {
       if (!isSupabaseConfigured || !requestId) return null
       try {
+        const { data: authData } = await supabase.auth.getUser()
+        const currentUserId = authData?.user?.id
+
         const { data, error } = await supabase
           .from('request_contacts')
           .select('*')
@@ -393,7 +408,16 @@ export function useRequestContact(requestId: string) {
           .maybeSingle()
 
         if (error || !data) return null
-        return data as RequestContact
+        const contact = data as RequestContact
+
+        // Security check: if calling is disabled and current user is not coordinator, sanitize phone
+        if (options?.allowCalls === false && (!currentUserId || currentUserId !== options.requesterId)) {
+          return {
+            ...contact,
+            contact_phone: '',
+          }
+        }
+        return contact
       } catch (err) {
         console.warn('Error fetching request contact:', err)
         return null

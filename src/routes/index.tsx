@@ -3,6 +3,7 @@ import { LoginPage }          from '@/features/auth/LoginPage'
 import { ForgotPasswordPage }  from '@/features/auth/ForgotPasswordPage'
 import { ResetPasswordPage }   from '@/features/auth/ResetPasswordPage'
 import { UpdatePasswordPage }  from '@/features/auth/UpdatePasswordPage'
+import { AuthCallbackPage }    from '@/features/auth/AuthCallbackPage'
 import { HomePage }            from '@/features/requests/HomePage'
 import { BrowsePage }          from '@/features/requests/BrowsePage'
 import { RequestDetailPage }   from '@/features/requests/RequestDetailPage'
@@ -13,8 +14,7 @@ import { ProfilePage }         from '@/features/profile/ProfilePage'
 import { CreateDrivePage }     from '@/routes/CreateDrivePage'
 import { BrowseDrivesPage }     from '@/routes/BrowseDrivesPage'
 import { DriveDetailPage }      from '@/routes/DriveDetailPage'
-import { MyRequestsPage }      from '@/routes/MyRequestsPage'
-import { BrowseDonationsPage }  from '@/routes/BrowseDonationsPage'
+import { MyActivityPage }      from '@/routes/MyActivityPage'
 
 import { TrackerPage }         from '@/features/requests/TrackerPage'
 
@@ -22,18 +22,22 @@ export const router = createBrowserRouter([
   // Root → redirect to home dashboard
   { path: '/',         element: <Navigate to="/home" replace /> },
 
-  // Auth
+  // Auth & Email Verification
   { path: '/login',           element: <LoginPage /> },
   { path: '/forgot-password', element: <ForgotPasswordPage /> },
   { path: '/update-password', element: <UpdatePasswordPage /> },
   { path: '/reset-password',  element: <ResetPasswordPage /> },
+  { path: '/auth/callback',   element: <AuthCallbackPage /> },
+  { path: '/verify-email',    element: <AuthCallbackPage /> },
+  { path: '/confirm-email',   element: <AuthCallbackPage /> },
 
   // Main app tabs
   { path: '/home',             element: <HomePage /> },
   { path: '/browse',           element: <BrowsePage /> },
-  { path: '/browse-donations', element: <BrowseDonationsPage /> },
+  { path: '/browse-donations', element: <Navigate to="/browse?type=donations" replace /> },
   { path: '/drives',           element: <BrowseDrivesPage /> },
-  { path: '/my-requests',      element: <MyRequestsPage /> },
+  { path: '/my-activity',      element: <MyActivityPage /> },
+  { path: '/my-requests',      element: <Navigate to="/my-activity" replace /> },
   { path: '/create',       element: <CreatePage /> },
   { path: '/create-drive', element: <Navigate to="/drives/create" replace /> },
   { path: '/alerts',        element: <AlertsPage /> },

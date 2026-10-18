@@ -15,10 +15,10 @@
   },
   {
     "testName": "Direct URL Navigation: /my-requests",
-    "result": "PASS",
-    "evidence": "HTTP status 200, page rendered content \"My Requests\" without 404",
-    "rootCause": "Vite client SPA routing missing rewrite rules on static servers",
-    "fix": "Added public/_redirects (/* /index.html 200) and netlify.toml rewrite"
+    "result": "FAIL",
+    "evidence": "HTTP 200, expected content \"My Requests\" found=false",
+    "rootCause": "Missing SPA fallback configuration",
+    "fix": "Configure SPA redirects"
   },
   {
     "testName": "Direct URL Navigation: /profile",
@@ -128,7 +128,7 @@
   {
     "testName": "Request Listing: Real-Time Availability in Public Browse Feed",
     "result": "PASS",
-    "evidence": "Newly created request \"Automated QA Flood Relief Request 1792240651610\" found in Browse feed: true",
+    "evidence": "Newly created request \"Automated QA Flood Relief Request 1792308968982\" found in Browse feed: true",
     "rootCause": "N/A",
     "fix": "N/A"
   },
@@ -140,9 +140,16 @@
     "fix": "N/A"
   },
   {
+    "testName": "Donor UI: Over-Offering Validation & Real-time Remaining Clamp",
+    "result": "FAIL",
+    "evidence": "Over-offering warning triggered when quantity exceeds remaining: false",
+    "rootCause": "N/A",
+    "fix": "N/A"
+  },
+  {
     "testName": "Donor Offer Submission: Confirmation Lifecycle",
-    "result": "PASS",
-    "evidence": "Offer submission completed: true",
+    "result": "FAIL",
+    "evidence": "Offer submission completed: false",
     "rootCause": "N/A",
     "fix": "N/A"
   },

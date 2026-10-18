@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { TopBar } from '@/components/layout/TopBar'
@@ -10,10 +10,10 @@ import { Modal } from '@/components/ui/Modal'
 import { Toast } from '@/components/ui/Toast'
 import { StatusBadge } from '@/components/ui/Badge'
 import { PushNotificationSettings } from '@/components/notifications/PushNotificationSettings'
-import { LogOut, User, MapPin, Mail, Shield, Sparkles, ArrowRight, Lock, CheckCircle2 } from 'lucide-react'
+import { LogOut, User, MapPin, Mail, Shield, Sparkles, ArrowRight, Lock, CheckCircle2, Phone, Save } from 'lucide-react'
 
 export function ProfilePage() {
-  const { user, upgradeAccount, signOut } = useAuth()
+  const { user, upgradeAccount, signOut, updateContactPhone } = useAuth()
   const navigate = useNavigate()
 
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false)
@@ -22,6 +22,20 @@ export function ProfilePage() {
   const [isUpgrading, setIsUpgrading] = useState(false)
   const [upgradeError, setUpgradeError] = useState<string | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+
+  const [upgradeSuccessEmail, setUpgradeSuccessEmail] = useState<string | null>(null)
+
+  // Contact number state
+  const [phoneInput, setPhoneInput] = useState(user?.phone || '')
+  const [isSavingPhone, setIsSavingPhone] = useState(false)
+  const [phoneError, setPhoneError] = useState<string | null>(null)
+  const [phoneSaved, setPhoneSaved] = useState(false)
+
+  useEffect(() => {
+    if (user?.phone) {
+      setPhoneInput(user.phone)
+    }
+  }, [user?.phone])
 
   if (!user) return null
 
@@ -32,11 +46,39 @@ export function ProfilePage() {
     setTimeout(() => setToastMessage(null), 4000)
   }
 
+  const handleSavePhone = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setPhoneError(null)
+    setPhoneSaved(false)
+
+    const trimmed = phoneInput.trim()
+    if (trimmed) {
+      const cleanDigits = trimmed.replace(/\D/g, '')
+      if (cleanDigits.length < 7) {
+        setPhoneError('Please enter a valid phone number with at least 7 digits')
+        return
+      }
+    }
+
+    setIsSavingPhone(true)
+    const { error } = await updateContactPhone(trimmed)
+    setIsSavingPhone(false)
+
+    if (error) {
+      setPhoneError(error.message || 'Failed to save contact number')
+    } else {
+      setPhoneSaved(true)
+      showToast(trimmed ? 'Contact number saved to your profile' : 'Contact number cleared')
+      setTimeout(() => setPhoneSaved(false), 3000)
+    }
+  }
+
   const handleUpgradeSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setUpgradeError(null)
 
-    if (!upgradeEmail.trim()) {
+    const trimmed = upgradeEmail.trim()
+    if (!trimmed) {
       setUpgradeError('Please enter a valid email address')
       return
     }
@@ -46,16 +88,14 @@ export function ProfilePage() {
     }
 
     setIsUpgrading(true)
-    const { error } = await upgradeAccount(upgradeEmail.trim(), upgradePassword)
+    const { error } = await upgradeAccount(trimmed, upgradePassword)
     setIsUpgrading(false)
 
     if (error) {
       setUpgradeError(error.message || 'Failed to save account. Please try again.')
     } else {
-      setIsUpgradeModalOpen(false)
-      setUpgradeEmail('')
-      setUpgradePassword('')
-      showToast('Account saved successfully! You can now log in from any device.')
+      setUpgradeSuccessEmail(trimmed)
+      showToast(`Account saved! Verification link sent to ${trimmed}`)
     }
   }
 
@@ -148,6 +188,11 @@ export function ProfilePage() {
               label: 'Email',
               value: isAnonymous ? 'Not registered (Guest)' : user.email,
             },
+            {
+              Icon: Phone,
+              label: 'Saved Contact',
+              value: user.phone || 'Not provided',
+            },
             { Icon: MapPin, label: 'Location', value: user.location ?? '—' },
             { Icon: Shield, label: 'Account Type', value: isAnonymous ? 'Guest (Unsaved)' : 'Verified Member' },
             { Icon: User, label: 'Member since', value: new Date(user.createdAt).getFullYear().toString() },
@@ -167,6 +212,65 @@ export function ProfilePage() {
           ))}
         </div>
 
+        {/* Contact Phone Management Card */}
+        <Card className="p-5 border border-slate-200/80 shadow-card flex flex-col gap-3">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center shrink-0 mt-0.5">
+              <Phone className="w-4 h-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="text-body font-bold text-navy-900 leading-snug">
+                  Contact Number
+                </h3>
+                {user.phone && (
+                  <span className="text-[11px] font-semibold text-brand-600 bg-brand-50 border border-brand-200 px-2 py-0.5 rounded-pill">
+                    Saved in profile
+                  </span>
+                )}
+              </div>
+              <p className="text-caption text-ink-muted mt-1 leading-relaxed">
+                Your contact number is kept private and never shown publicly on your profile. It is used to prefill logistics forms, and you choose whether to enable direct calls.
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleSavePhone} className="flex flex-col gap-3 pt-1">
+            <Input
+              id="profile-phone-input"
+              label="Phone / Mobile Number"
+              type="tel"
+              inputMode="tel"
+              placeholder="e.g. +91 98765 43210"
+              value={phoneInput}
+              onChange={e => {
+                setPhoneInput(e.target.value)
+                if (phoneError) setPhoneError(null)
+              }}
+              error={phoneError || undefined}
+            />
+
+            <div className="flex items-center justify-between gap-2">
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                isLoading={isSavingPhone}
+                leftIcon={<Save className="w-3.5 h-3.5" />}
+              >
+                Save Contact Number
+              </Button>
+
+              {phoneSaved && (
+                <span className="text-caption text-success font-medium flex items-center gap-1 animate-in fade-in duration-200">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Saved!
+                </span>
+              )}
+            </div>
+          </form>
+        </Card>
+
         {/* Push Notification Preferences */}
         <PushNotificationSettings />
 
@@ -184,65 +288,107 @@ export function ProfilePage() {
       {/* ── Save Account / Upgrade Modal ── */}
       <Modal
         isOpen={isUpgradeModalOpen}
-        onClose={() => setIsUpgradeModalOpen(false)}
-        title="Save Your Account"
+        onClose={() => {
+          setIsUpgradeModalOpen(false)
+          setUpgradeSuccessEmail(null)
+          setUpgradeEmail('')
+          setUpgradePassword('')
+        }}
+        title={upgradeSuccessEmail ? 'Verification Email Sent' : 'Save Your Account'}
         maxWidth="max-w-md"
       >
-        <form onSubmit={handleUpgradeSubmit} className="flex flex-col gap-4 select-text">
-          <p className="text-caption text-ink-muted leading-relaxed">
-            Convert your current session into a permanent ReliefLink account. Your requests, drives, and donation history will be preserved.
-          </p>
-
-          <Input
-            id="upgrade-email"
-            label="Email address"
-            type="email"
-            placeholder="you@example.com"
-            value={upgradeEmail}
-            onChange={e => setUpgradeEmail(e.target.value)}
-            leftIcon={<Mail className="w-4 h-4" />}
-            required
-            autoComplete="email"
-          />
-
-          <Input
-            id="upgrade-password"
-            label="Create password"
-            type="password"
-            placeholder="At least 6 characters"
-            value={upgradePassword}
-            onChange={e => setUpgradePassword(e.target.value)}
-            leftIcon={<Lock className="w-4 h-4" />}
-            required
-            autoComplete="new-password"
-          />
-
-          {upgradeError && (
-            <div className="bg-danger-bg border border-red-200 rounded-input p-3 text-caption text-danger">
-              {upgradeError}
+        {upgradeSuccessEmail ? (
+          <div className="py-2 text-center space-y-4">
+            <div className="w-14 h-14 rounded-full bg-green-50 border border-green-200 text-success flex items-center justify-center mx-auto shadow-sm">
+              <CheckCircle2 className="w-7 h-7 text-success" />
             </div>
-          )}
 
-          <div className="flex gap-2.5 pt-2">
+            <div>
+              <h3 className="text-h3 font-semibold text-navy-900">Check your email</h3>
+              <p className="text-caption text-ink-muted mt-1.5">
+                We sent a confirmation link to:
+              </p>
+              <div className="mt-2">
+                <span className="font-mono text-caption font-semibold text-navy-900 bg-brand-50 border border-brand-200 px-3 py-1 rounded-input inline-block break-all">
+                  {upgradeSuccessEmail}
+                </span>
+              </div>
+            </div>
+
+            <p className="text-caption text-ink bg-surface-low border border-slate-200 rounded-input p-3 text-left">
+              Click the link in the email to verify this address. Your active relief requests, drives, and donation history are now connected to this login.
+            </p>
+
             <Button
-              type="button"
-              variant="secondary"
-              fullWidth
-              onClick={() => setIsUpgradeModalOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
               variant="primary"
               fullWidth
-              isLoading={isUpgrading}
-              rightIcon={<CheckCircle2 className="w-4 h-4" />}
+              onClick={() => {
+                setIsUpgradeModalOpen(false)
+                setUpgradeSuccessEmail(null)
+                setUpgradeEmail('')
+                setUpgradePassword('')
+              }}
             >
-              Save Account
+              Done
             </Button>
           </div>
-        </form>
+        ) : (
+          <form onSubmit={handleUpgradeSubmit} className="flex flex-col gap-4 select-text">
+            <p className="text-caption text-ink-muted leading-relaxed">
+              Convert your current session into a permanent ReliefLink account. Your requests, drives, and donation history will be preserved.
+            </p>
+
+            <Input
+              id="upgrade-email"
+              label="Email address"
+              type="email"
+              placeholder="you@example.com"
+              value={upgradeEmail}
+              onChange={e => setUpgradeEmail(e.target.value)}
+              leftIcon={<Mail className="w-4 h-4" />}
+              required
+              autoComplete="email"
+            />
+
+            <Input
+              id="upgrade-password"
+              label="Create password"
+              type="password"
+              placeholder="At least 6 characters"
+              value={upgradePassword}
+              onChange={e => setUpgradePassword(e.target.value)}
+              leftIcon={<Lock className="w-4 h-4" />}
+              required
+              autoComplete="new-password"
+            />
+
+            {upgradeError && (
+              <div className="bg-danger-bg border border-red-200 rounded-input p-3 text-caption text-danger">
+                {upgradeError}
+              </div>
+            )}
+
+            <div className="flex gap-2.5 pt-2">
+              <Button
+                type="button"
+                variant="secondary"
+                fullWidth
+                onClick={() => setIsUpgradeModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                fullWidth
+                isLoading={isUpgrading}
+                rightIcon={<CheckCircle2 className="w-4 h-4" />}
+              >
+                Save Account
+              </Button>
+            </div>
+          </form>
+        )}
       </Modal>
 
       <Toast message={toastMessage} visible={Boolean(toastMessage)} />

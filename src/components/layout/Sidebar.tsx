@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { Home, Compass, ClipboardList, Plus, User, Truck, Heart } from 'lucide-react'
+import { Home, Compass, ClipboardList, Plus, User } from 'lucide-react'
 import { cn } from '@/utils/cn'
 
 interface SidebarProps {
@@ -9,6 +9,17 @@ interface SidebarProps {
 
 export function Sidebar({ className, onCreateClick }: SidebarProps) {
   const location = useLocation()
+
+  // Track active state for navigation highlights
+  const isBrowseActive =
+    location.pathname === '/browse' ||
+    location.pathname === '/drives' ||
+    location.pathname === '/browse-donations'
+
+  const isMyActivityActive =
+    location.pathname === '/my-activity' ||
+    location.pathname === '/my-requests'
+
   const isCreateActive =
     location.pathname === '/create' ||
     location.pathname === '/create-drive' ||
@@ -39,9 +50,9 @@ export function Sidebar({ className, onCreateClick }: SidebarProps) {
           <span className="text-h3 font-bold text-white tracking-tight">ReliefLink</span>
         </NavLink>
 
-        {/* Vertical nav list */}
+        {/* Vertical nav list: 5 unified primary tabs */}
         <nav aria-label="Sidebar main links" className="flex flex-col gap-1.5">
-          {/* Home */}
+          {/* 1. Home Dashboard */}
           <NavLink
             to="/home"
             className={({ isActive }) =>
@@ -57,13 +68,13 @@ export function Sidebar({ className, onCreateClick }: SidebarProps) {
             <span className="text-body font-medium">Home</span>
           </NavLink>
 
-          {/* Browse */}
+          {/* 2. Browse (Unified aid hub: Requests, Donations, Drives & Near Me filters) */}
           <NavLink
             to="/browse"
-            className={({ isActive }) =>
+            className={() =>
               cn(
                 'flex items-center gap-3 px-3 h-[44px] rounded-pill text-body transition-colors relative',
-                isActive
+                isBrowseActive
                   ? 'bg-brand-600 text-white font-semibold shadow-sm'
                   : 'text-brand-100 hover:text-white hover:bg-white/10 font-medium',
               )
@@ -73,55 +84,23 @@ export function Sidebar({ className, onCreateClick }: SidebarProps) {
             <span className="text-body font-medium">Browse</span>
           </NavLink>
 
-          {/* Drives */}
+          {/* 3. My Activity (Unified hub for user's requests, donation commitments & drives) */}
           <NavLink
-            to="/drives"
-            className={({ isActive }) =>
+            to="/my-activity"
+            className={() =>
               cn(
                 'flex items-center gap-3 px-3 h-[44px] rounded-pill text-body transition-colors relative',
-                isActive
-                  ? 'bg-brand-600 text-white font-semibold shadow-sm'
-                  : 'text-brand-100 hover:text-white hover:bg-white/10 font-medium',
-              )
-            }
-          >
-            <Truck className="w-6 h-6 shrink-0" strokeWidth={2} />
-            <span className="text-body font-medium">Drives</span>
-          </NavLink>
-
-          {/* Donations */}
-          <NavLink
-            to="/browse-donations"
-            className={({ isActive }) =>
-              cn(
-                'flex items-center gap-3 px-3 h-[44px] rounded-pill text-body transition-colors relative',
-                isActive
-                  ? 'bg-brand-600 text-white font-semibold shadow-sm'
-                  : 'text-brand-100 hover:text-white hover:bg-white/10 font-medium',
-              )
-            }
-          >
-            <Heart className="w-6 h-6 shrink-0" strokeWidth={2} />
-            <span className="text-body font-medium">Donations</span>
-          </NavLink>
-
-          {/* My Requests */}
-          <NavLink
-            to="/my-requests"
-            className={({ isActive }) =>
-              cn(
-                'flex items-center gap-3 px-3 h-[44px] rounded-pill text-body transition-colors relative',
-                isActive
+                isMyActivityActive
                   ? 'bg-brand-600 text-white font-semibold shadow-sm'
                   : 'text-brand-100 hover:text-white hover:bg-white/10 font-medium',
               )
             }
           >
             <ClipboardList className="w-6 h-6 shrink-0" strokeWidth={2} />
-            <span className="text-body font-medium">My Requests</span>
+            <span className="text-body font-medium">My Activity</span>
           </NavLink>
 
-          {/* Create (triggers chooser modal) */}
+          {/* 4. Create (Modal chooser for requests and collection drives) */}
           <button
             type="button"
             onClick={onCreateClick}
@@ -137,7 +116,7 @@ export function Sidebar({ className, onCreateClick }: SidebarProps) {
             <span className="text-body font-medium">Create</span>
           </button>
 
-          {/* Profile */}
+          {/* 5. User Profile & Settings */}
           <NavLink
             to="/profile"
             className={({ isActive }) =>

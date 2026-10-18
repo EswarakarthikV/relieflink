@@ -51,6 +51,23 @@ export const INITIAL_MOCK_NOTIFICATIONS: Notification[] = [
 ]
 
 let mockMarkedRead = false
+let dynamicMockNotifications: Notification[] = [...INITIAL_MOCK_NOTIFICATIONS]
+
+export function addNotification(
+  notif: Omit<Notification, 'id' | 'createdAt' | 'isRead'> & { id?: string; createdAt?: string; isRead?: boolean }
+) {
+  const newNotif: Notification = {
+    id: notif.id || `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    type: notif.type,
+    title: notif.title,
+    body: notif.body,
+    isRead: notif.isRead ?? false,
+    relatedRequestId: notif.relatedRequestId,
+    relatedOfferId: notif.relatedOfferId,
+    createdAt: notif.createdAt || new Date().toISOString(),
+  }
+  dynamicMockNotifications = [newNotif, ...dynamicMockNotifications]
+}
 
 export function setMockNotificationsRead(read: boolean = true) {
   mockMarkedRead = read
@@ -105,7 +122,7 @@ export async function fetchNotifications(): Promise<Notification[]> {
 
   // Fallback to mock notifications
   const allRead = isMockMarkedRead()
-  return INITIAL_MOCK_NOTIFICATIONS.map(n => ({
+  return dynamicMockNotifications.map(n => ({
     ...n,
     isRead: allRead ? true : n.isRead,
   }))

@@ -25,6 +25,39 @@ export interface ItemMatchResult {
   converted_quantity: number | null
 }
 
+export interface AIParsedRequestItem {
+  name: string
+  category: string
+  unit: string
+  quantity: number
+}
+
+export interface AIParsedRequestResult {
+  title: string
+  description: string
+  location: string
+  urgency: 'low' | 'medium' | 'high' | 'critical'
+  items: AIParsedRequestItem[]
+  missing_info: string[]
+}
+
+export interface AIParsedDriveItem {
+  name: string
+  unit: string
+  target_quantity: number
+}
+
+export interface AIParsedDriveResult {
+  title: string
+  description: string
+  from_city: string
+  to_city: string
+  destination_event: string
+  categories: string[]
+  target_items: AIParsedDriveItem[]
+  missing_info: string[]
+}
+
 const REGIONAL_SUPPLY_DICTIONARY: Record<string, string> = {
   // Water
   paani: 'water',
@@ -181,4 +214,24 @@ export async function normalizeSearchQuery(queryText: string): Promise<string> {
     console.warn('AI search normalization fallback to raw term:', err)
     return trimmed
   }
+}
+
+/**
+ * Analyzes natural language description of a relief request and suggests prefilled fields.
+ */
+export async function parseReliefRequest(inputText: string): Promise<AIParsedRequestResult> {
+  return callServerAI<AIParsedRequestResult>({
+    action: 'parse-relief-request',
+    inputText,
+  })
+}
+
+/**
+ * Analyzes natural language description of a collection drive and suggests prefilled logistics fields.
+ */
+export async function parseCollectionDrive(inputText: string): Promise<AIParsedDriveResult> {
+  return callServerAI<AIParsedDriveResult>({
+    action: 'parse-collection-drive',
+    inputText,
+  })
 }

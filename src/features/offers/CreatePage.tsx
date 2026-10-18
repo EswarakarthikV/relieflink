@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { TopBar } from '@/components/layout/TopBar'
@@ -7,7 +7,7 @@ import { Input, Textarea } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { TitleEnhancer } from '@/components/TitleEnhancer'
 import { DescriptionEnhancer } from '@/components/DescriptionEnhancer'
-import { AlertTriangle, MapPin, Package, Plus, X, Navigation, Map, Lock } from 'lucide-react'
+import { AlertTriangle, MapPin, Package, Plus, X, Navigation, Map, Lock, Sparkles, Loader2, Info, CheckCircle2, Phone, PhoneOff } from 'lucide-react'
 import type { UrgencyLevel } from '@/types'
 import { cn } from '@/utils/cn'
 import { urgencyLabel, urgencyBadgeClasses } from '@/utils/urgency'
@@ -16,6 +16,8 @@ import { queryClient } from '@/lib/queryClient'
 import { LocationPickerModal, reverseGeocodeNominatim } from '@/components/LocationPickerModal'
 import { Toast } from '@/components/ui/Toast'
 import { triggerRemotePush } from '@/lib/pushNotifications'
+import { parseReliefRequest } from '@/lib/gemini'
+import { useAuth } from '@/hooks/useAuth'
 
 const URGENCY_OPTIONS: UrgencyLevel[] = ['low', 'medium', 'high', 'critical']
 const UNIT_OPTIONS = ['bottles', 'kg', 'kits', 'liters', 'packets', 'units']
@@ -45,6 +47,7 @@ interface FormState {
   items: ItemRow[]
   contact_name: string
   contact_phone: string
+  allow_calls: boolean
   latitude?: number
   longitude?: number
 }
@@ -57,11 +60,24 @@ const INITIAL_FORM: FormState = {
   items: [createInitialItem()],
   contact_name: '',
   contact_phone: '',
+  allow_calls: true,
 }
 
 export function CreatePage() {
+  const { user } = useAuth()
   const [form, setForm] = useState<FormState>(INITIAL_FORM)
   const [submitted, setSubmitted] = useState(false)
+
+  // Prefill contact details from signed-in user's profile
+  useEffect(() => {
+    if (user) {
+      setForm(prev => ({
+        ...prev,
+        contact_name: prev.contact_name || user.name || '',
+        contact_phone: prev.contact_phone || user.phone || '',
+      }))
+    }
+  }, [user?.name, user?.phone])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLocating, setIsLocating] = useState(false)
   const [locationError, setLocationError] = useState<string | null>(null)
@@ -78,6 +94,13 @@ export function CreatePage() {
   const [toastVisible, setToastVisible] = useState(false)
   const [toastVariant, setToastVariant] = useState<'success' | 'warning'>('success')
 
+  // AI-assisted planning state
+  const [aiPromptOpen, setAiPromptOpen] = useState(false)
+  const [aiInputText, setAiInputText] = useState('')
+  const [isAiLoading, setIsAiLoading] = useState(false)
+  const [aiMissingInfo, setAiMissingInfo] = useState<string[]>([])
+  const [aiAppliedAlert, setAiAppliedAlert] = useState(false)
+
   const showToast = (msg: string, variant: 'success' | 'warning' = 'success') => {
     setToastMessage(msg)
     setToastVariant(variant)
@@ -85,6 +108,47 @@ export function CreatePage() {
     setTimeout(() => {
       setToastVisible(false)
     }, 4000)
+  }
+
+  const handleAIAssist = async () => {
+    if (!aiInputText.trim() || isAiLoading) return
+    setIsAiLoading(true)
+    setAiAppliedAlert(false)
+    setAiMissingInfo([])
+
+    try {
+      const parsed = await parseReliefRequest(aiInputText.trim())
+
+      // Build updated items array
+      const mappedItems: ItemRow[] = (parsed.items || []).map(item => ({
+        id: Math.random().toString(36).substring(2, 9),
+        name: item.name,
+        quantity: String(item.quantity || 50),
+        unit: UNIT_OPTIONS.includes(item.unit) ? item.unit : 'units',
+        category: CATEGORY_OPTIONS.includes(item.category) ? item.category : 'Other',
+      }))
+
+      setForm(prev => ({
+        ...prev,
+        title: parsed.title || prev.title,
+        description: parsed.description || prev.description,
+        location: parsed.location ? parsed.location : prev.location,
+        urgency: parsed.urgency || prev.urgency,
+        items: mappedItems.length > 0 ? mappedItems : prev.items,
+      }))
+
+      if (parsed.missing_info && parsed.missing_info.length > 0) {
+        setAiMissingInfo(parsed.missing_info)
+      }
+
+      setAiAppliedAlert(true)
+      showToast('Form prefilled with AI suggestions. Please review and edit below!', 'success')
+    } catch (err: any) {
+      console.warn('AI assist failed:', err)
+      showToast('Could not analyze with AI. Please fill in details manually.', 'warning')
+    } finally {
+      setIsAiLoading(false)
+    }
   }
 
 
@@ -242,24 +306,41 @@ export function CreatePage() {
       if (!user) throw new Error('Not signed in');
 
       // Step 1: Insert ONE row into requests with requester_id: user.id
-      const { data: reqData, error: reqError } = await supabase
+      const requestPayload: any = {
+        requester_id: user.id,
+        title: form.title.trim(),
+        description: form.description.trim() || null,
+        urgency: form.urgency,
+        status: 'open',
+        city: form.location.trim(),
+        address_line: form.location.trim(),
+        latitude: form.latitude ?? null,
+        longitude: form.longitude ?? null,
+        allow_calls: form.allow_calls,
+      }
+
+      let reqData: any
+      const { data: insertedData, error: reqError } = await supabase
         .from('requests')
-        .insert([{
-          requester_id: user.id,
-          title: form.title.trim(),
-          description: form.description.trim() || null,
-          urgency: form.urgency,
-          status: 'open',
-          city: form.location.trim(),
-          address_line: form.location.trim(),
-          latitude: form.latitude ?? null,
-          longitude: form.longitude ?? null,
-        }])
+        .insert([requestPayload])
         .select('id')
         .single()
 
       if (reqError) {
-        throw new Error(reqError.message || 'Failed to create request in database')
+        if (reqError.message?.toLowerCase().includes('allow_calls')) {
+          delete requestPayload.allow_calls
+          const { data: retryData, error: retryError } = await supabase
+            .from('requests')
+            .insert([requestPayload])
+            .select('id')
+            .single()
+          if (retryError) throw new Error(retryError.message || 'Failed to create request in database')
+          reqData = retryData
+        } else {
+          throw new Error(reqError.message || 'Failed to create request in database')
+        }
+      } else {
+        reqData = insertedData
       }
 
         createdRequestId = reqData.id
@@ -369,6 +450,97 @@ export function CreatePage() {
                 <span>{submitError}</span>
               </div>
             )}
+
+            {/* ── AI Assistant Feature ── */}
+            <div className="rounded-card border border-brand-200 bg-brand-50/50 p-4 transition-all">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-brand-600 text-white flex items-center justify-center shadow-xs">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-body font-semibold text-navy-900 leading-snug">
+                      Help me fill this with AI
+                    </h3>
+                    <p className="text-[12px] text-ink-muted">
+                      Describe your situation in natural language to prefill supplies, location, and urgency.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAiPromptOpen(prev => !prev)}
+                  className="text-caption font-semibold text-brand-600 hover:text-brand-700 px-2.5 py-1 rounded-pill bg-white border border-brand-200 shadow-xs"
+                >
+                  {aiPromptOpen ? 'Close' : 'Try AI'}
+                </button>
+              </div>
+
+              {aiPromptOpen && (
+                <div className="mt-3.5 pt-3.5 border-t border-brand-100/80 flex flex-col gap-2.5">
+                  <Textarea
+                    placeholder="e.g. 'We need drinking water, food, blankets, and hygiene supplies for families affected by flooding in Chennai.'"
+                    rows={2}
+                    value={aiInputText}
+                    onChange={e => setAiInputText(e.target.value)}
+                    className="bg-white"
+                  />
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-ink-muted">
+                      AI suggestions require your manual review and approval before submitting.
+                    </span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="primary"
+                      onClick={handleAIAssist}
+                      disabled={isAiLoading || !aiInputText.trim()}
+                      className="gap-1.5 shrink-0"
+                    >
+                      {isAiLoading ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Analyzing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>Prefill Form</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* AI Applied confirmation banner */}
+              {aiAppliedAlert && (
+                <div className="mt-3 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-caption flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-emerald-900">AI suggestions applied to the form!</p>
+                    <p className="text-[12px] text-emerald-700 mt-0.5">
+                      Review all titles, quantities, items, and urgency below. You can edit or remove any suggested field.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Missing Information checklist */}
+              {aiMissingInfo.length > 0 && (
+                <div className="mt-3 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-caption flex items-start gap-2">
+                  <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-amber-900">Missing information you may need to provide:</p>
+                    <ul className="list-disc list-inside mt-1 text-[12px] text-amber-800 space-y-0.5">
+                      {aiMissingInfo.map((info, idx) => (
+                        <li key={idx}>{info}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Urgency selector */}
             <div className="flex flex-col gap-2">
@@ -560,12 +732,19 @@ export function CreatePage() {
                 <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center shrink-0 mt-0.5">
                   <Lock className="w-4 h-4 text-brand-600" />
                 </div>
-                <div>
-                  <h3 className="text-caption font-semibold text-ink">
-                    Private Contact
-                  </h3>
-                  <p className="text-[12px] text-ink-muted leading-relaxed">
-                    Coordinator contact details are private. Only visible to verified donors with active delivery offers.
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-caption font-semibold text-ink">
+                      Private Contact
+                    </h3>
+                    {user?.phone && form.contact_phone === user.phone && (
+                      <span className="text-[11px] font-semibold text-brand-600 bg-brand-50 border border-brand-200 px-2 py-0.5 rounded-pill">
+                        Prefilled from profile
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[12px] text-ink-muted leading-relaxed mt-0.5">
+                    Coordinator contact details are private. Only visible to verified donors with active delivery offers. You can edit this if creating on behalf of another coordinator.
                   </p>
                 </div>
               </div>
@@ -594,6 +773,34 @@ export function CreatePage() {
                 }}
                 error={errors.contact_phone}
               />
+
+              {/* Owner-controlled Call Button Toggle */}
+              <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200/80 mt-1">
+                <div className="space-y-0.5 pr-2">
+                  <div className="flex items-center gap-1.5">
+                    {form.allow_calls ? (
+                      <Phone className="w-4 h-4 text-brand-600" />
+                    ) : (
+                      <PhoneOff className="w-4 h-4 text-ink-muted" />
+                    )}
+                    <span className="text-body font-semibold text-navy-900">
+                      Enable Direct Call Button
+                    </span>
+                  </div>
+                  <p className="text-[12px] text-ink-muted leading-relaxed">
+                    {form.allow_calls
+                      ? 'Verified donors with active offers can tap "Call Coordinator" via their phone dialer. Your raw number is never shown publicly.'
+                      : 'Call button is hidden. Inquiries and updates are coordinated strictly through the app.'}
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  id="request-allow-calls-toggle"
+                  checked={form.allow_calls}
+                  onChange={e => setField('allow_calls', e.target.checked)}
+                  className="w-5 h-5 text-brand-600 rounded border-slate-300 focus:ring-brand-600 cursor-pointer shrink-0"
+                />
+              </div>
             </div>
 
             {/* Critical warning */}

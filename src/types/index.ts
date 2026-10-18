@@ -5,13 +5,13 @@ export type UrgencyLevel = 'low' | 'medium' | 'high' | 'critical'
 export type RequestStatus = 'open' | 'partially_fulfilled' | 'fulfilled' | 'closed'
 
 // ── Offer / donation status ───────────────────────────────────────────────
-export type OfferStatus = 'pending' | 'accepted' | 'dispatched' | 'delivered' | 'cancelled'
+export type OfferStatus = 'pending' | 'accepted' | 'dispatched' | 'delivered' | 'cancelled' | 'rejected'
 
 // ── Delivery method ───────────────────────────────────────────────────────
 export type DeliveryMethod = 'self' | 'courier' | 'pickup'
 
 // ── Notification type ─────────────────────────────────────────────────────
-export type NotificationType = 'offer_received' | 'offer_accepted' | 'dispatched' | 'delivered' | 'new_request'
+export type NotificationType = 'offer_received' | 'offer_accepted' | 'dispatched' | 'delivered' | 'new_request' | 'pickup'
 
 // ── User role ─────────────────────────────────────────────────────────────
 export type UserRole = 'donor' | 'requester' | 'coordinator' | 'admin'
@@ -25,6 +25,7 @@ export interface User {
   role: UserRole
   avatarInitials: string
   location?: string
+  phone?: string
   createdAt: string
   is_anonymous?: boolean
 }
@@ -57,6 +58,7 @@ export interface Request {
   requesterId: string
   requesterName: string
   donorCount: number
+  allow_calls?: boolean
   createdAt: string
   updatedAt: string
   expiresAt?: string
@@ -81,6 +83,13 @@ export interface Offer {
   unit: string
   quantityOffered: number
   deliveryMethod: DeliveryMethod
+  pickupDate?: string
+  pickupTimeWindow?: string
+  pickupAddress?: string
+  pickupContact?: string
+  pickupNotes?: string
+  pickupStatus?: 'pending' | 'accepted' | 'declined' | 'completed' | 'not_applicable'
+  allow_calls?: boolean
   earliestDate: string
   message?: string
   status: OfferStatus
@@ -191,6 +200,7 @@ export interface CollectionDrive {
   allow_dropoff?: boolean
   allow_courier?: boolean
   require_dropoff?: boolean
+  allow_calls?: boolean
   status: DriveStatus | string
   dispatched_at?: string | null
   dispatch_notes?: string | null

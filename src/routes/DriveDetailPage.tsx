@@ -29,6 +29,7 @@ import {
   Navigation,
   FileCheck2,
   Phone,
+  PhoneOff,
   Info,
   Check,
 } from 'lucide-react'
@@ -391,7 +392,7 @@ export function DriveDetailPage() {
           <p className="text-caption text-ink-muted mt-1 mb-4">
             This collection drive could not be loaded or has been removed.
           </p>
-          <Button variant="secondary" onClick={() => navigate('/drives')}>
+          <Button variant="secondary" onClick={() => navigate('/browse?type=drives')}>
             Browse all drives
           </Button>
         </div>
@@ -649,12 +650,22 @@ export function DriveDetailPage() {
               <p className="text-body font-semibold text-navy-900 leading-tight">
                 {drive.organizer_name || drive.collector_name || 'Community Organizer'}
               </p>
-              {drive.organizer_contact && (
-                <p className="text-caption text-brand-600 font-medium flex items-center gap-1 mt-0.5">
-                  <Phone className="w-3 h-3" />
-                  {drive.organizer_contact}
-                </p>
-              )}
+              <div className="mt-1">
+                {drive.allow_calls === false ? (
+                  <span className="text-[11px] text-ink-muted flex items-center gap-1">
+                    <PhoneOff className="w-3 h-3 text-ink-muted" />
+                    Direct calling disabled by organizer
+                  </span>
+                ) : drive.organizer_contact ? (
+                  <a
+                    href={`tel:${drive.organizer_contact}`}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-pill bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200/80 text-[12px] font-semibold transition-colors active:scale-95 shadow-2xs select-none"
+                  >
+                    <Phone className="w-3 h-3 text-brand-600" />
+                    <span>Call Organizer</span>
+                  </a>
+                ) : null}
+              </div>
             </div>
           </div>
           <ShieldCheck className="w-5 h-5 text-success" />
