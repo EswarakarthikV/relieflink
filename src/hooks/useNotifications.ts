@@ -2,56 +2,10 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import type { Notification, NotificationType } from '@/types'
 
-export const INITIAL_MOCK_NOTIFICATIONS: Notification[] = [
-  {
-    id: 'n-001',
-    type: 'offer_accepted',
-    title: 'Offer Accepted',
-    body: 'Your offer of 40 water bottles for "Drinking water for 200 families" has been accepted.',
-    isRead: false,
-    relatedRequestId: 'req-001',
-    createdAt: new Date(Date.now() - 30 * 60_000).toISOString(),
-  },
-  {
-    id: 'n-002',
-    type: 'new_request',
-    title: 'Critical request near you',
-    body: 'Emergency Tarpaulins needed in Shivajinagar (3.5 km away).',
-    isRead: false,
-    relatedRequestId: 'req-004',
-    createdAt: new Date(Date.now() - 2 * 3_600_000).toISOString(),
-  },
-  {
-    id: 'n-003',
-    type: 'dispatched',
-    title: 'Shipment dispatched',
-    body: 'Pediatric Antibiotics consignment is now in transit to Camp Area.',
-    isRead: false,
-    relatedRequestId: 'req-002',
-    createdAt: new Date(Date.now() - 4 * 3_600_000).toISOString(),
-  },
-  {
-    id: 'n-004',
-    type: 'delivered',
-    title: 'Delivery confirmed',
-    body: 'Ration packets (80 boxes) confirmed delivered at Shivajinagar. Thank you!',
-    isRead: true,
-    relatedRequestId: 'req-003',
-    createdAt: new Date(Date.now() - 24 * 3_600_000).toISOString(),
-  },
-  {
-    id: 'n-005',
-    type: 'new_request',
-    title: 'High-urgency request posted',
-    body: 'Field Hospital Alpha posted a new request for Saline Kits (80 packs needed).',
-    isRead: true,
-    relatedRequestId: 'req-002',
-    createdAt: new Date(Date.now() - 2 * 86_400_000).toISOString(),
-  },
-]
+export const INITIAL_MOCK_NOTIFICATIONS: Notification[] = []
 
 let mockMarkedRead = false
-let dynamicMockNotifications: Notification[] = [...INITIAL_MOCK_NOTIFICATIONS]
+let dynamicMockNotifications: Notification[] = []
 
 export function addNotification(
   notif: Omit<Notification, 'id' | 'createdAt' | 'isRead'> & { id?: string; createdAt?: string; isRead?: boolean }
@@ -103,7 +57,7 @@ export async function fetchNotifications(): Promise<Notification[]> {
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
 
-        if (!error && data && data.length > 0) {
+        if (!error && data) {
           return data.map((n: any): Notification => ({
             id: String(n.id),
             type: (n.kind as NotificationType) || 'new_request',
@@ -132,12 +86,11 @@ export function useNotifications() {
   const query = useQuery<Notification[]>({
     queryKey: ['notifications'],
     queryFn: fetchNotifications,
+    refetchOnMount: 'always',
+    staleTime: 0,
   })
 
-  const notifications = query.data ?? INITIAL_MOCK_NOTIFICATIONS.map(n => ({
-    ...n,
-    isRead: isMockMarkedRead() ? true : n.isRead,
-  }))
+  const notifications = query.data ?? []
 
   const unreadCount = notifications.filter(n => !n.isRead).length
 

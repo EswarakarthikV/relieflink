@@ -23,52 +23,7 @@ export interface DonationItem {
 }
 
 // Fallback mock donations for offline / demo mode
-const MOCK_DONATIONS: DonationItem[] = [
-  {
-    id: 'off-mock-1',
-    quantity_offered: 50,
-    unit: 'bottles',
-    status: 'dispatched',
-    item_name: 'Water',
-    request_id: 'req-001',
-    request_title: 'Drinking water for 200 families',
-    donor_name: 'Priya Sharma',
-    created_at: new Date(Date.now() - 2 * 3600_000).toISOString(),
-  },
-  {
-    id: 'off-mock-2',
-    quantity_offered: 20,
-    unit: 'kits',
-    status: 'delivered',
-    item_name: 'Hygiene kits',
-    request_id: 'req-001',
-    request_title: 'Drinking water for 200 families',
-    donor_name: 'Rotary Club Pune',
-    created_at: new Date(Date.now() - 4 * 3600_000).toISOString(),
-  },
-  {
-    id: 'off-mock-3',
-    quantity_offered: 100,
-    unit: 'packets',
-    status: 'pending',
-    item_name: 'Dry Rations',
-    request_id: 'req-002',
-    request_title: 'Emergency Food Supplies for Flood Victims',
-    donor_name: 'Apex Logistics',
-    created_at: new Date(Date.now() - 6 * 3600_000).toISOString(),
-  },
-  {
-    id: 'off-mock-4',
-    quantity_offered: 30,
-    unit: 'blankets',
-    status: 'dispatched',
-    item_name: 'Warm Blankets',
-    request_id: 'req-003',
-    request_title: 'Shelter kits and blankets for camp #4',
-    donor_name: 'Community Care Foundation',
-    created_at: new Date(Date.now() - 12 * 3600_000).toISOString(),
-  },
-]
+const MOCK_DONATIONS: DonationItem[] = []
 
 export function BrowseDonationsPage() {
   const [search, setSearch] = useState('')
@@ -100,7 +55,7 @@ export function BrowseDonationsPage() {
             .not('status', 'in', '("cancelled","rejected")')
             .order('created_at', { ascending: false })
 
-          if (!error && data && data.length > 0) {
+          if (!error && data) {
             return data.map((row: any) => ({
               id: row.id,
               quantity_offered: Number(row.quantity_offered) || 0,
@@ -122,9 +77,10 @@ export function BrowseDonationsPage() {
         }
       }
 
-      return MOCK_DONATIONS
+      return []
     },
     refetchOnMount: 'always',
+    staleTime: 0,
   })
 
   // Basic search filter by item name

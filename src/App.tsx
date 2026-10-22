@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { RouterProvider } from 'react-router-dom'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClient } from '@/lib/queryClient'
@@ -7,6 +7,11 @@ import { AuthProvider } from '@/hooks/useAuth'
 import { SplashScreen } from '@/components/layout/SplashScreen'
 
 export default function App() {
+  useEffect(() => {
+    // Clear and invalidate cached query results on mount so app always fetches fresh data from Supabase
+    queryClient.clear()
+    queryClient.invalidateQueries()
+  }, [])
   const [showSplash, setShowSplash] = useState(() => {
     try {
       return !sessionStorage.getItem('relieflink_splash_seen')

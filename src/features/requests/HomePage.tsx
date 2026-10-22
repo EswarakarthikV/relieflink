@@ -136,17 +136,17 @@ export function HomePage() {
   const activeOffersCount =
     userOffers !== null && userOffers !== undefined
       ? userOffers.filter(o => o.status === 'pending' || o.status === 'dispatched' || o.status === 'accepted').length
-      : 2
+      : 0
 
   const deliveredOffersCount =
     userOffers !== null && userOffers !== undefined
       ? userOffers.filter(o => o.status === 'delivered').length
-      : 1
+      : 0
 
   const totalVolume =
     userOffers !== null && userOffers !== undefined
       ? userOffers.reduce((sum, o) => sum + (Number(o.quantity_delivered) || Number(o.quantity_offered) || 0), 0)
-      : 480
+      : 0
 
   const activeDrivesCount = drivesData.length
 
@@ -288,13 +288,20 @@ export function HomePage() {
         </div>
 
         <div className="flex gap-3 overflow-x-auto pb-2 px-4 scroll-x">
-          {isRequestsLoading
-            ? [0, 1, 2].map(i => (
-                <div key={i} className="w-[280px] min-w-[280px]">
-                  <CardSkeleton />
-                </div>
-              ))
-            : urgentRequests.map(req => <UrgentCard key={req.id} request={req} />)}
+          {isRequestsLoading ? (
+            [0, 1, 2].map(i => (
+              <div key={i} className="w-[280px] min-w-[280px]">
+                <CardSkeleton />
+              </div>
+            ))
+          ) : urgentRequests.length === 0 ? (
+            <div className="w-full py-6 text-center bg-surface rounded-card border border-slate-200/80 p-4">
+              <p className="text-body font-semibold text-ink">No urgent requests at the moment</p>
+              <p className="text-caption text-ink-muted mt-0.5">All community needs are currently met or none have been submitted yet.</p>
+            </div>
+          ) : (
+            urgentRequests.map(req => <UrgentCard key={req.id} request={req} />)
+          )}
         </div>
       </section>
 
@@ -392,17 +399,22 @@ export function HomePage() {
           <span className="text-[11px] font-medium text-ink-muted tracking-wider uppercase">Live Feed</span>
         </div>
         <div className="bg-surface rounded-card shadow-card border border-slate-200/80 overflow-hidden">
-          {isRequestsLoading
-            ? [0, 1, 2].map(i => (
-                <div key={i} className="flex items-center gap-3 p-3.5 border-b border-slate-100 last:border-0">
-                  <div className="skeleton w-8 h-8 rounded-full" />
-                  <div className="flex-1 space-y-2">
-                    <div className="skeleton h-3 w-3/4 rounded" />
-                    <div className="skeleton h-3 w-1/2 rounded" />
-                  </div>
+          {isRequestsLoading ? (
+            [0, 1, 2].map(i => (
+              <div key={i} className="flex items-center gap-3 p-3.5 border-b border-slate-100 last:border-0">
+                <div className="skeleton w-8 h-8 rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <div className="skeleton h-3 w-3/4 rounded" />
+                  <div className="skeleton h-3 w-1/2 rounded" />
                 </div>
-              ))
-            : allRequests.slice(0, 3).map((req, i) => (
+              </div>
+            ))
+          ) : allRequests.length === 0 ? (
+            <div className="p-8 text-center text-caption text-ink-muted">
+              No recent activity recorded yet.
+            </div>
+          ) : (
+            allRequests.slice(0, 3).map((req, i) => (
                 <Link
                   key={req.id}
                   to={`/requests/${req.id}`}
@@ -422,7 +434,8 @@ export function HomePage() {
                   </div>
                   <UrgencyBadge urgency={req.urgency} />
                 </Link>
-              ))}
+              )))
+          }
         </div>
       </section>
     </AppShell>

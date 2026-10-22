@@ -45,52 +45,7 @@ export interface DonationItem {
   created_at: string
 }
 
-const MOCK_DONATIONS: DonationItem[] = [
-  {
-    id: 'off-mock-1',
-    quantity_offered: 50,
-    unit: 'bottles',
-    status: 'dispatched',
-    item_name: 'Water',
-    request_id: 'req-001',
-    request_title: 'Drinking water for 200 families',
-    donor_name: 'Priya Sharma',
-    created_at: new Date(Date.now() - 2 * 3600_000).toISOString(),
-  },
-  {
-    id: 'off-mock-2',
-    quantity_offered: 20,
-    unit: 'kits',
-    status: 'delivered',
-    item_name: 'Hygiene kits',
-    request_id: 'req-001',
-    request_title: 'Drinking water for 200 families',
-    donor_name: 'Rotary Club Pune',
-    created_at: new Date(Date.now() - 4 * 3600_000).toISOString(),
-  },
-  {
-    id: 'off-mock-3',
-    quantity_offered: 100,
-    unit: 'packets',
-    status: 'pending',
-    item_name: 'Dry Rations',
-    request_id: 'req-002',
-    request_title: 'Emergency Food Supplies for Flood Victims',
-    donor_name: 'Apex Logistics',
-    created_at: new Date(Date.now() - 6 * 3600_000).toISOString(),
-  },
-  {
-    id: 'off-mock-4',
-    quantity_offered: 30,
-    unit: 'blankets',
-    status: 'dispatched',
-    item_name: 'Warm Blankets',
-    request_id: 'req-003',
-    request_title: 'Shelter kits and blankets for camp #4',
-    donor_name: 'Community Care Foundation',
-    created_at: new Date(Date.now() - 12 * 3600_000).toISOString(),
-  },
-]
+const MOCK_DONATIONS: DonationItem[] = []
 
 type UrgencyChip = 'all' | UrgencyLevel | 'open'
 
@@ -216,7 +171,7 @@ export function BrowsePage() {
             .not('status', 'in', '("cancelled","rejected")')
             .order('created_at', { ascending: false })
 
-          if (!error && data && data.length > 0) {
+          if (!error && data) {
             return data.map((row: any): DonationItem => ({
               id: row.id,
               quantity_offered: Number(row.quantity_offered) || 0,
@@ -233,9 +188,10 @@ export function BrowsePage() {
           console.warn('Error querying donations in browse:', err)
         }
       }
-      return MOCK_DONATIONS
+      return []
     },
-    staleTime: 5000,
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
 
   const isLoading = isRequestsLoading || isDrivesLoading || isDonationsLoading
@@ -462,6 +418,23 @@ export function BrowsePage() {
           [0, 1, 2, 3].map(i => <CardSkeleton key={i} />)
         ) : (
           <>
+            {/* ── Empty State for All ── */}
+            {activeSection === 'all' && filteredRequests.length === 0 && filteredDonations.length === 0 && filteredDrives.length === 0 && (
+              <div className="py-16 text-center bg-surface rounded-card border border-slate-200/80 shadow-card p-6">
+                <div className="w-12 h-12 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center mx-auto mb-3">
+                  <ClipboardList className="w-6 h-6" />
+                </div>
+                <p className="text-h3 font-semibold text-ink mb-1">No relief activities found</p>
+                <p className="text-caption text-ink-muted max-w-sm mx-auto mb-4">
+                  There are currently no active crisis requests, donation offers, or collection drives.
+                </p>
+                <Link to="/create">
+                  <Button variant="primary" size="sm">
+                    Create First Request
+                  </Button>
+                </Link>
+              </div>
+            )}
             {/* ── 1. REQUESTS SECTION ── */}
             {(activeSection === 'all' || activeSection === 'requests' || activeSection === 'nearby') && (
               <div className="space-y-3">

@@ -4,81 +4,7 @@ import type { Request, Offer, RequestFilters, PaginatedResponse, SupplyItem, Req
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 
 // ── Mock data ─────────────────────────────────────────────────────────────
-const MOCK_REQUESTS: Request[] = [
-  {
-    id: 'req-001',
-    refNumber: 'REQ-2024-089',
-    title: 'Drinking water for 200 families',
-    urgency: 'critical',
-    status: 'partially_fulfilled',
-    location: 'Kothrud, Pune',
-    distanceKm: 4.2,
-    donorCount: 3,
-    requesterId: 'usr-req-001',
-    requesterName: 'Ngo Pune Relief',
-    items: [
-      { id: '71f59a32-b4c5-4143-b878-786ddd766680', name: 'Drinking water', unit: 'bottles', quantityRequested: 200, quantityCommitted: 120, quantityDelivered: 0, category: 'Water' },
-      { id: '2978245a-cb1c-4c39-b016-db134a38ed55', name: 'Hygiene kits',   unit: 'kits',    quantityRequested: 50,  quantityCommitted: 20,  quantityDelivered: 0, category: 'Hygiene' },
-      { id: 'ac83ebbc-8afa-4cc5-a84c-efbcbbd5958e', name: 'Blankets',       unit: 'units',   quantityRequested: 30,  quantityCommitted: 0,   quantityDelivered: 0, category: 'Shelter' },
-    ],
-    createdAt: new Date(Date.now() - 2 * 3_600_000).toISOString(),
-    updatedAt: new Date(Date.now() - 30 * 60_000).toISOString(),
-    disasterContext: 'Pune Flash Flood Relief',
-  },
-  {
-    id: 'req-002',
-    refNumber: 'REQ-2024-091',
-    title: 'Pediatric Antibiotics & Saline',
-    urgency: 'high',
-    status: 'partially_fulfilled',
-    location: 'Camp Area, Pune',
-    distanceKm: 1.8,
-    donorCount: 2,
-    requesterId: 'usr-req-002',
-    requesterName: 'Field Hospital Alpha',
-    items: [
-      { id: 'item-003', name: 'Pediatric antibiotics', unit: 'vials', quantityRequested: 150, quantityCommitted: 45, quantityDelivered: 0, category: 'Medical' },
-      { id: 'item-004', name: 'Saline kits',           unit: 'packs', quantityRequested: 80,  quantityCommitted: 0,  quantityDelivered: 0, category: 'Medical' },
-    ],
-    createdAt: new Date(Date.now() - 4 * 3_600_000).toISOString(),
-    updatedAt: new Date(Date.now() - 10 * 60_000).toISOString(),
-  },
-  {
-    id: 'req-003',
-    refNumber: 'REQ-2024-093',
-    title: 'Emergency Ration Packets (7-Day)',
-    urgency: 'medium',
-    status: 'partially_fulfilled',
-    location: 'Shivajinagar, Pune',
-    distanceKm: 2.1,
-    donorCount: 5,
-    requesterId: 'usr-req-003',
-    requesterName: 'Disaster Relief Cell',
-    items: [
-      { id: 'item-005', name: 'Dry ration boxes', unit: 'boxes', quantityRequested: 100, quantityCommitted: 95, quantityDelivered: 80, category: 'Food' },
-      { id: 'item-006', name: 'Baby food packs',  unit: 'packs', quantityRequested: 30,  quantityCommitted: 28, quantityDelivered: 25, category: 'Food' },
-    ],
-    createdAt: new Date(Date.now() - 1 * 3_600_000).toISOString(),
-    updatedAt: new Date(Date.now() - 5 * 60_000).toISOString(),
-  },
-  {
-    id: 'req-004',
-    refNumber: 'REQ-2024-095',
-    title: 'Emergency Tarpaulins & Shelter Kits',
-    urgency: 'critical',
-    status: 'open',
-    location: 'Shivajinagar, Pune',
-    distanceKm: 3.5,
-    donorCount: 1,
-    requesterId: 'usr-req-003',
-    requesterName: 'Disaster Relief Cell',
-    items: [
-      { id: 'item-007', name: 'Tarpaulin rolls', unit: 'rolls', quantityRequested: 150, quantityCommitted: 80, quantityDelivered: 0, category: 'Shelter' },
-    ],
-    createdAt: new Date(Date.now() - 3 * 3_600_000).toISOString(),
-    updatedAt: new Date(Date.now() - 45 * 60_000).toISOString(),
-  },
-]
+const MOCK_REQUESTS: Request[] = []
 
 export interface RequestItemStat {
   request_item_id: string
@@ -102,7 +28,11 @@ async function fetchRequests(_filters?: RequestFilters): Promise<PaginatedRespon
         .select('*, request_items(*)')
         .order('created_at', { ascending: false })
 
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
+        if (data.length === 0) {
+          return { data: [], total: 0, page: 1, perPage: 20, hasMore: false }
+        }
+
         const { data: allStats } = await supabase
           .from('request_item_stats')
           .select('*')
@@ -148,16 +78,14 @@ async function fetchRequests(_filters?: RequestFilters): Promise<PaginatedRespon
           }
         })
 
-        const all = [...dbRequests, ...MOCK_REQUESTS]
-        return { data: all, total: all.length, page: 1, perPage: 20, hasMore: false }
+        return { data: dbRequests, total: dbRequests.length, page: 1, perPage: 20, hasMore: false }
       }
     } catch (err) {
-      console.warn('Error fetching requests from Supabase, falling back to mock:', err)
+      console.warn('Error fetching requests from Supabase:', err)
     }
   }
 
-  await new Promise(r => setTimeout(r, 400))
-  return { data: MOCK_REQUESTS, total: MOCK_REQUESTS.length, page: 1, perPage: 20, hasMore: false }
+  return { data: [], total: 0, page: 1, perPage: 20, hasMore: false }
 }
 
 async function fetchRequest(id: string): Promise<Request> {
@@ -241,6 +169,8 @@ export function useRequests(filters?: RequestFilters) {
   return useQuery({
     queryKey: ['requests', filters],
     queryFn: () => fetchRequests(filters),
+    refetchOnMount: 'always',
+    staleTime: 0,
   })
 }
 
@@ -249,6 +179,8 @@ export function useRequest(id: string) {
     queryKey: ['request', id],
     queryFn: () => fetchRequest(id),
     enabled: Boolean(id),
+    refetchOnMount: 'always',
+    staleTime: 0,
   })
 }
 
@@ -319,6 +251,8 @@ async function fetchMyRequests(userId: string): Promise<Request[]> {
         .order('created_at', { ascending: false })
 
       if (!error && data) {
+        if (data.length === 0) return []
+
         const { data: allStats } = await supabase
           .from('request_item_stats')
           .select('*')
@@ -364,7 +298,7 @@ async function fetchMyRequests(userId: string): Promise<Request[]> {
     }
   }
 
-  return MOCK_REQUESTS.filter(r => r.requesterId === userId)
+  return []
 }
 
 export function useMyRequests(userId?: string) {
@@ -372,6 +306,8 @@ export function useMyRequests(userId?: string) {
     queryKey: ['my_requests', userId],
     queryFn: () => (userId ? fetchMyRequests(userId) : Promise.resolve([])),
     enabled: Boolean(userId),
+    refetchOnMount: 'always',
+    staleTime: 0,
   })
 }
 

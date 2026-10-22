@@ -30,161 +30,11 @@ export function calculateDistanceKm(
   return Math.round(R * c * 10) / 10
 }
 
-export const INITIAL_MOCK_DRIVES: CollectionDrive[] = [
-  {
-    id: 'drive-001',
-    collector_id: 'usr-col-001',
-    collector_name: 'Erode Youth Forum',
-    organizer_name: 'Erode Youth Forum',
-    organizer_contact: '+91 98401 23456',
-    title: 'Erode to Chennai Flood Relief Drive',
-    description: 'Collecting blankets, dry food, and clean water bottles to deliver directly to Royapettah Relief Camp in Chennai.',
-    from_city: 'Erode',
-    to_city: 'Chennai',
-    destination_city: 'Chennai',
-    destination_event: 'Chennai Flood Relief',
-    destination_camp: 'Royapettah Relief Camp',
-    destination_lat: 13.0569,
-    destination_lng: 80.2575,
-    collection_location: 'Erode Bus Stand Hub',
-    collection_address: 'Central Community Hall, Bus Stand Road, Erode',
-    collection_lat: 11.3410,
-    collection_lng: 77.7172,
-    departure_date: '2026-10-20',
-    deadline: '2026-10-19T20:00:00.000Z',
-    vehicle_type: 'Truck',
-    capacity_kg: 500,
-    needs: ['Water', 'Food', 'Blankets', 'Hygiene'],
-    target_items: [
-      { name: 'Water (Bottles)', unit: 'bottles', target_quantity: 200, pledged_quantity: 60, accepted_quantity: 40, collected_quantity: 30 },
-      { name: 'Blankets', unit: 'pieces', target_quantity: 100, pledged_quantity: 35, accepted_quantity: 25, collected_quantity: 15 },
-      { name: 'Biscuits / Dry Food', unit: 'packets', target_quantity: 150, pledged_quantity: 50, accepted_quantity: 30, collected_quantity: 20 },
-      { name: 'Hygiene Kits', unit: 'kits', target_quantity: 50, pledged_quantity: 10, accepted_quantity: 10, collected_quantity: 5 },
-    ],
-    accepted_items: ['Packed drinking water', 'New blankets', 'Sealed biscuits', 'Sanitary napkins', 'Soap & toothbrushes'],
-    unaccepted_items: ['Cooked or perishable food', 'Used or torn clothes', 'Expired medicines', 'Liquids in open containers'],
-    instructions: 'Please pack in sturdy cardboard boxes or waterproof bags. Label each box with contents.',
-    pickup_enabled: true,
-    pickup_radius_km: 15,
-    allow_pickup: true,
-    allow_dropoff: true,
-    allow_courier: true,
-    require_dropoff: false,
-    status: 'open',
-    created_at: new Date(Date.now() - 24 * 3600_000).toISOString(),
-    profiles: {
-      full_name: 'Erode Youth Forum',
-      phone: '+91 98401 23456',
-    },
-  },
-  {
-    id: 'drive-002',
-    collector_id: 'usr-col-002',
-    collector_name: 'Coimbatore Care Trust',
-    organizer_name: 'Coimbatore Care Trust',
-    organizer_contact: '+91 98940 88776',
-    title: 'Coimbatore Wayanad Emergency Supplies',
-    description: 'Dispatching essential medical kits, tarpaulins and shelter materials to Meppadi Community Health Centre.',
-    from_city: 'Coimbatore',
-    to_city: 'Wayanad',
-    destination_city: 'Wayanad',
-    destination_event: 'Wayanad Landslide Support',
-    destination_camp: 'Meppadi Relief Base',
-    destination_lat: 11.5516,
-    destination_lng: 76.1264,
-    collection_location: 'Gandhipuram Relief Centre',
-    collection_address: 'VOC Park Gate 2, Gandhipuram, Coimbatore',
-    collection_lat: 11.0168,
-    collection_lng: 76.9558,
-    departure_date: '2026-10-22',
-    deadline: '2026-10-21T18:00:00.000Z',
-    vehicle_type: 'Van',
-    capacity_kg: 350,
-    needs: ['Medical', 'Shelter', 'Blankets'],
-    target_items: [
-      { name: 'First Aid Kits', unit: 'kits', target_quantity: 80, pledged_quantity: 20, accepted_quantity: 15, collected_quantity: 10 },
-      { name: 'Tarpaulin Sheets', unit: 'sheets', target_quantity: 60, pledged_quantity: 15, accepted_quantity: 10, collected_quantity: 5 },
-      { name: 'Warm Blankets', unit: 'pieces', target_quantity: 120, pledged_quantity: 40, accepted_quantity: 30, collected_quantity: 25 },
-    ],
-    accepted_items: ['New tarpaulins', 'Antiseptic & bandages', 'Torches & batteries', 'Thermal wear'],
-    unaccepted_items: ['Prescription drugs without prescription', 'Glass bottles', 'Cooked meals'],
-    instructions: 'Drop off between 9 AM and 7 PM at Gate 2. Pickups available for orders > 20 kg within 10 km.',
-    pickup_enabled: true,
-    pickup_radius_km: 10,
-    allow_pickup: true,
-    allow_dropoff: true,
-    allow_courier: false,
-    require_dropoff: false,
-    allow_calls: false,
-    status: 'open',
-    created_at: new Date(Date.now() - 12 * 3600_000).toISOString(),
-    profiles: {
-      full_name: 'Coimbatore Care Trust',
-      phone: '+91 98940 88776',
-    },
-  },
-]
+export const INITIAL_MOCK_DRIVES: CollectionDrive[] = []
+export const INITIAL_MOCK_CONTRIBUTIONS: DriveContribution[] = []
 
-export const INITIAL_MOCK_CONTRIBUTIONS: DriveContribution[] = [
-  {
-    id: 'contrib-001',
-    drive_id: 'drive-001',
-    donor_id: 'usr-donor-1',
-    donor_name: 'Anand Kumar',
-    donor_contact: '+91 98765 43210',
-    is_anonymous: false,
-    delivery_method: 'self_delivery',
-    donor_address: '14 Perundurai Road, Erode',
-    donor_lat: 11.332,
-    donor_lng: 77.712,
-    distance_km: 1.2,
-    status: 'collected',
-    items: [
-      { item_name: 'Blankets', quantity: 10, unit: 'pieces' },
-      { item_name: 'Water (Bottles)', quantity: 20, unit: 'bottles' },
-    ],
-    notes: 'Dropped off at the counter yesterday.',
-    created_at: new Date(Date.now() - 20 * 3600_000).toISOString(),
-  },
-  {
-    id: 'contrib-002',
-    drive_id: 'drive-001',
-    donor_id: 'usr-donor-2',
-    donor_name: 'Kavitha R',
-    donor_contact: '+91 98765 11223',
-    is_anonymous: false,
-    delivery_method: 'pickup',
-    donor_address: '22 Solar Nagar, Erode',
-    donor_lat: 11.315,
-    donor_lng: 77.732,
-    distance_km: 3.4,
-    pickup_scheduled_at: '2026-10-18T14:00:00.000Z',
-    status: 'accepted',
-    items: [
-      { item_name: 'Biscuits / Dry Food', quantity: 25, unit: 'packets' },
-    ],
-    notes: 'Please call before arriving.',
-    created_at: new Date(Date.now() - 10 * 3600_000).toISOString(),
-  },
-  {
-    id: 'contrib-003',
-    drive_id: 'drive-001',
-    donor_id: 'usr-donor-3',
-    donor_name: 'Secret Helper',
-    donor_contact: '+91 94432 99887',
-    is_anonymous: true,
-    delivery_method: 'self_delivery',
-    status: 'accepted',
-    items: [
-      { item_name: 'Water (Bottles)', quantity: 40, unit: 'bottles' },
-    ],
-    notes: 'Will bring by Saturday noon.',
-    created_at: new Date(Date.now() - 6 * 3600_000).toISOString(),
-  },
-]
-
-let mockDrivesStore: CollectionDrive[] = [...INITIAL_MOCK_DRIVES]
-let mockContributionsStore: DriveContribution[] = [...INITIAL_MOCK_CONTRIBUTIONS]
+let mockDrivesStore: CollectionDrive[] = []
+let mockContributionsStore: DriveContribution[] = []
 
 const isValidUUID = (str: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)
@@ -202,7 +52,7 @@ export async function fetchDrives(): Promise<CollectionDrive[]> {
         .select('*, profiles:collector_id(id, full_name)')
         .order('departure_date', { ascending: true })
 
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         return data.map((d: any) => {
           const drive = { ...d } as CollectionDrive
           if (drive.allow_calls === false && (!currentUserId || currentUserId !== drive.collector_id)) {
@@ -222,12 +72,10 @@ export async function fetchDrives(): Promise<CollectionDrive[]> {
     }
   }
 
-  return mockDrivesStore
+  return []
 }
 
 export async function fetchDrive(id: string): Promise<CollectionDrive | null> {
-  const localMatch = mockDrivesStore.find(d => d.id === id)
-
   if (isSupabaseConfigured && isValidUUID(id)) {
     try {
       const { data: authData } = await supabase.auth.getUser()
@@ -240,7 +88,7 @@ export async function fetchDrive(id: string): Promise<CollectionDrive | null> {
         .maybeSingle()
 
       if (!error && data) {
-        const drive = { ...(localMatch || {}), ...data } as CollectionDrive
+        const drive = { ...data } as CollectionDrive
         if (drive.allow_calls === false && (!currentUserId || currentUserId !== drive.collector_id)) {
           drive.organizer_contact = undefined
         }
@@ -257,7 +105,7 @@ export async function fetchDrive(id: string): Promise<CollectionDrive | null> {
     }
   }
 
-  return localMatch || null
+  return mockDrivesStore.find(d => d.id === id) || null
 }
 
 // ── Create Drive ─────────────────────────────────────────────────────────────

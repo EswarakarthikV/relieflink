@@ -27,67 +27,10 @@ export interface TrackerOffer {
   created_at: string
 }
 
-export const INITIAL_MOCK_OFFERS: TrackerOffer[] = [
-  {
-    id: 'off-001',
-    request_id: 'req-001',
-    request_item_id: '71f59a32-b4c5-4143-b878-786ddd766680',
-    donor_id: 'usr-donor-001',
-    donor_name: 'Priya Sharma',
-    item_name: 'Drinking water',
-    unit: 'bottles',
-    quantity_offered: 80,
-    quantity_dispatched: 0,
-    quantity_delivered: 0,
-    status: 'pending',
-    delivery_method: 'self',
-    message: 'Can supply 80 sealed 2L water bottles from Kothrud warehouse.',
-    created_at: new Date(Date.now() - 40 * 60_000).toISOString(),
-  },
-  {
-    id: 'off-002',
-    request_id: 'req-001',
-    request_item_id: '71f59a32-b4c5-4143-b878-786ddd766680',
-    donor_id: 'usr-donor-002',
-    donor_name: 'Apex Logistics',
-    item_name: 'Drinking water',
-    unit: 'bottles',
-    quantity_offered: 40,
-    quantity_dispatched: 40,
-    quantity_delivered: 0,
-    status: 'dispatched',
-    delivery_method: 'courier',
-    message: 'Dispatched via truck MH-12-AB-1234.',
-    created_at: new Date(Date.now() - 120 * 60_000).toISOString(),
-    dispatched_at: new Date(Date.now() - 60 * 60_000).toISOString(),
-  },
-  {
-    id: 'off-003',
-    request_id: 'req-001',
-    request_item_id: '2978245a-cb1c-4c39-b016-db134a38ed55',
-    donor_id: 'usr-donor-003',
-    donor_name: 'Rotary Club Pune',
-    item_name: 'Hygiene kits',
-    unit: 'kits',
-    quantity_offered: 20,
-    quantity_dispatched: 20,
-    quantity_delivered: 20,
-    status: 'delivered',
-    delivery_method: 'pickup',
-    pickup_date: new Date().toISOString().slice(0, 10),
-    pickup_time_window: 'Morning (9 AM - 12 PM)',
-    pickup_address: 'Rotary Center, Law College Road, Pune',
-    pickup_contact: '+91 98220 12345',
-    pickup_status: 'accepted',
-    allow_calls: false,
-    message: 'Delivered to Kothrud volunteer reception desk.',
-    created_at: new Date(Date.now() - 240 * 60_000).toISOString(),
-    delivered_at: new Date(Date.now() - 30 * 60_000).toISOString(),
-  },
-]
+export const INITIAL_MOCK_OFFERS: TrackerOffer[] = []
 
 // In-memory mock store for demo/fallback interactions
-let mockOffersStore: TrackerOffer[] = [...INITIAL_MOCK_OFFERS]
+let mockOffersStore: TrackerOffer[] = []
 
 export function addMockOffer(offer: TrackerOffer) {
   mockOffersStore = [offer, ...mockOffersStore]
@@ -269,6 +212,6 @@ export function useUserOffers(donorId?: string) {
     queryKey: ['user_offers', donorId],
     queryFn: () => fetchUserOffers(donorId),
     refetchOnMount: 'always',
-    staleTime: 5000,
+    staleTime: 0,
   })
 }
