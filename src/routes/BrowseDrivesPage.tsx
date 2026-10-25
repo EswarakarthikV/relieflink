@@ -128,10 +128,10 @@ export function BrowseDrivesPage() {
   return (
     <AppShell>
       <TopBar title="Collection Drives" variant="navy" />
-      <div className="pt-20 px-4 pb-24 max-w-2xl mx-auto flex flex-col gap-5">
+      <div className="pt-16 pb-24 max-w-2xl mx-auto flex flex-col gap-5 w-full min-w-0">
         {/* Header Action Bar */}
-        <div className="flex items-center justify-between gap-4">
-          <div>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full min-w-0">
+          <div className="min-w-0 flex-1">
             <h1 className="text-h2 font-bold text-navy-900 tracking-tight">Collection Drives</h1>
             <p className="text-caption text-ink-muted mt-0.5">
               Community volunteer hubs collecting and transporting relief supplies
@@ -141,7 +141,7 @@ export function BrowseDrivesPage() {
             variant="primary"
             size="md"
             onClick={() => navigate('/drives/create')}
-            className="shrink-0 bg-brand-600 hover:bg-brand-700 text-white font-medium shadow-sm flex items-center gap-1.5"
+            className="self-start sm:self-auto shrink-0 bg-brand-600 hover:bg-brand-700 text-white font-medium shadow-sm flex items-center gap-1.5"
           >
             <Plus className="w-4 h-4" />
             <span>Start a drive</span>
@@ -149,8 +149,8 @@ export function BrowseDrivesPage() {
         </div>
 
         {/* Search Bar with AI Semantic Normalization */}
-        <div className="flex flex-col gap-1.5">
-          <div className="relative flex items-center">
+        <div className="flex flex-col gap-1.5 w-full min-w-0">
+          <div className="relative flex items-center w-full">
             <Search className="absolute left-3 w-4 h-4 text-ink-muted pointer-events-none" />
             <input
               type="text"
@@ -169,7 +169,7 @@ export function BrowseDrivesPage() {
         </div>
 
         {/* Filter Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 text-caption scrollbar-none">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 text-caption scrollbar-none w-full max-w-full min-w-0">
           <div className="flex items-center gap-1.5 shrink-0 text-ink-muted font-medium mr-1">
             <Filter className="w-3.5 h-3.5" />
             <span>Status:</span>

@@ -172,7 +172,9 @@ export function BrowsePage() {
             .order('created_at', { ascending: false })
 
           if (!error && data) {
-            return data.map((row: any): DonationItem => ({
+            return data
+              .filter((row: any) => !row.requests?.title?.startsWith('Automated QA ') && !row.requests?.title?.startsWith('[TEST]'))
+              .map((row: any): DonationItem => ({
               id: row.id,
               quantity_offered: Number(row.quantity_offered) || 0,
               unit: row.request_items?.unit || 'units',

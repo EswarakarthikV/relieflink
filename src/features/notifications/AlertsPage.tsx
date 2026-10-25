@@ -52,14 +52,14 @@ export function AlertsPage() {
         variant="navy"
       />
 
-      <div className="pt-16 max-w-lg mx-auto">
+      <div className="pt-16 max-w-lg mx-auto w-full min-w-0">
         {/* Push Notification Controls */}
-        <div className="px-4 pt-4 pb-2">
+        <div className="pt-4 pb-2 w-full min-w-0">
           <PushNotificationSettings />
         </div>
 
         {/* Header row */}
-        <div className="px-4 pt-4 pb-2 flex items-center justify-between">
+        <div className="pt-4 pb-2 flex items-center justify-between w-full min-w-0">
           <h2 className="text-h4 font-semibold text-ink">Recent Activity</h2>
           <button
             type="button"
@@ -71,7 +71,7 @@ export function AlertsPage() {
         </div>
 
         {/* Notification list */}
-        <div className="bg-surface rounded-card border border-slate-200/80 shadow-card mx-4 overflow-hidden">
+        <div className="bg-surface rounded-card border border-slate-200/80 shadow-card overflow-hidden w-full min-w-0">
           {notifications.map((notif, i) => {
             const meta = ICON_MAP[notif.type] ?? ICON_MAP['new_request']
             const { Icon } = meta

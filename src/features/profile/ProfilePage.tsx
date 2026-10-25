@@ -187,7 +187,7 @@ export function ProfilePage() {
     <AppShell>
       <TopBar title="Profile" variant="navy" />
 
-      <div className="pt-16 px-4 pb-12 space-y-4 max-w-lg mx-auto">
+      <div className="pt-16 pb-12 space-y-4 max-w-lg mx-auto w-full min-w-0">
         {/* ── Guest Warning / Save Data Banner ── */}
         {isAnonymous && (
           <Card className="p-5 border border-brand-200 bg-brand-50/50 shadow-card flex flex-col gap-3">

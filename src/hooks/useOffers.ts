@@ -169,7 +169,9 @@ export async function fetchUserOffers(donorId?: string): Promise<UserOfferItem[]
         .order('created_at', { ascending: false })
 
       if (!error && data) {
-        return data.map((row: any): UserOfferItem => ({
+        return data
+          .filter((row: any) => !row.requests?.title?.startsWith('Automated QA ') && !row.requests?.title?.startsWith('[TEST]'))
+          .map((row: any): UserOfferItem => ({
           id: row.id,
           request_id: row.request_id,
           request_item_id: row.request_item_id || '',

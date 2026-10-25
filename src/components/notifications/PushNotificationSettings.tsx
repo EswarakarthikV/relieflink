@@ -110,12 +110,12 @@ export function PushNotificationSettings({ compact = false }: PushNotificationSe
   return (
     <Card className="p-4 sm:p-5 border border-slate-200/90 shadow-card bg-surface overflow-hidden">
       {/* Header */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2.5">
+      <div className="flex flex-wrap sm:flex-nowrap items-start justify-between gap-2.5">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
           <div className="w-9 h-9 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center shrink-0">
             <BellRing className="w-4 h-4" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h3 className="text-body font-bold text-ink leading-tight">
               Mobile Push Notifications
             </h3>
@@ -124,7 +124,7 @@ export function PushNotificationSettings({ compact = false }: PushNotificationSe
             </p>
           </div>
         </div>
-        <div>{getStatusBadge()}</div>
+        <div className="shrink-0 self-start">{getStatusBadge()}</div>
       </div>
 
       {/* Explanation of Benefits */}

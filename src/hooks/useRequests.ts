@@ -39,7 +39,9 @@ async function fetchRequests(_filters?: RequestFilters): Promise<PaginatedRespon
 
         const statsMap = new Map((allStats || []).map((s: any) => [s.request_item_id, s]))
 
-        const dbRequests: Request[] = data.map((r: any, idx: number) => {
+        const dbRequests: Request[] = data
+          .filter((r: any) => !r.title?.startsWith('Automated QA ') && !r.title?.startsWith('[TEST]'))
+          .map((r: any, idx: number) => {
           const items: SupplyItem[] = (r.request_items || []).map((it: any) => {
             const stat = statsMap.get(it.id)
             return {
@@ -259,7 +261,9 @@ async function fetchMyRequests(userId: string): Promise<Request[]> {
 
         const statsMap = new Map((allStats || []).map((s: any) => [s.request_item_id, s]))
 
-        const dbRequests: Request[] = data.map((r: any) => {
+        const dbRequests: Request[] = data
+          .filter((r: any) => !r.title?.startsWith('Automated QA ') && !r.title?.startsWith('[TEST]'))
+          .map((r: any) => {
           const items: SupplyItem[] = (r.request_items || []).map((it: any) => {
             const stat = statsMap.get(it.id)
             return {

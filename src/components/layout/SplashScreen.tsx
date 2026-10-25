@@ -12,19 +12,16 @@ export function SplashScreen({ onFinish, duration = 2400 }: SplashScreenProps) {
 
   // Staggered animation triggers
   const [showLogo, setShowLogo] = useState(false)
-  const [showQuote, setShowQuote] = useState(false)
   const [showBrand, setShowBrand] = useState(false)
   const [showTagline, setShowTagline] = useState(false)
 
   useEffect(() => {
     // Stage 1: Reveal logo immediately
-    const t0 = setTimeout(() => setShowLogo(true), 100)
-    // Stage 2: Reveal inspirational quote
-    const t1 = setTimeout(() => setShowQuote(true), 400)
-    // Stage 3: Reveal brand name typography
-    const t2 = setTimeout(() => setShowBrand(true), 700)
-    // Stage 4: Reveal tagline
-    const t3 = setTimeout(() => setShowTagline(true), 950)
+    const t0 = setTimeout(() => setShowLogo(true), 150)
+    // Stage 2: Reveal brand name typography
+    const t1 = setTimeout(() => setShowBrand(true), 500)
+    // Stage 3: Reveal caption
+    const t2 = setTimeout(() => setShowTagline(true), 800)
 
     // Fade out stage
     const fadeTimer = setTimeout(() => {
@@ -41,7 +38,6 @@ export function SplashScreen({ onFinish, duration = 2400 }: SplashScreenProps) {
       clearTimeout(t0)
       clearTimeout(t1)
       clearTimeout(t2)
-      clearTimeout(t3)
       clearTimeout(fadeTimer)
       clearTimeout(finishTimer)
     }
@@ -115,11 +111,11 @@ export function SplashScreen({ onFinish, duration = 2400 }: SplashScreenProps) {
       </div>
 
       {/* ── Main Center Branding Content ─────────────────────────────────── */}
-      <div className="relative z-10 flex flex-col items-center text-center max-w-sm mx-auto my-auto w-full">
-        {/* 1. Official Logo (Preserved proportions, transparency, uncropped) */}
+      <div className="relative z-10 flex flex-col items-center text-center max-w-sm mx-auto my-auto w-full px-4">
+        {/* 1. Official Logo (Single Logo Asset) */}
         <div
           className={cn(
-            'relative mb-5 transition-all duration-700 ease-out transform',
+            'relative mb-4 transition-all duration-700 ease-out transform',
             showLogo
               ? 'opacity-100 scale-100 translate-y-0'
               : 'opacity-0 scale-95 translate-y-3',
@@ -131,51 +127,37 @@ export function SplashScreen({ onFinish, duration = 2400 }: SplashScreenProps) {
             aria-hidden="true"
           />
           <img
-            src="/icons/relieflink-logo.png"
+            src="/icons/logo-mark.png"
             alt="ReliefLink Logo"
-            className="relative w-40 sm:w-48 h-auto object-contain drop-shadow-[0_10px_28px_rgba(34,211,197,0.35)]"
+            className="relative w-28 sm:w-32 h-auto object-contain drop-shadow-[0_10px_28px_rgba(34,211,197,0.35)]"
           />
         </div>
 
-        {/* 2. Inspirational Quote */}
+        {/* 2. One ReliefLink Brand Name Typography */}
         <div
           className={cn(
-            'px-2 transition-all duration-700 ease-out transform',
-            showQuote
-              ? 'opacity-100 translate-y-0'
-              : 'opacity-0 translate-y-3',
-          )}
-        >
-          <p className="text-[15px] sm:text-[16px] font-medium text-white/90 italic leading-relaxed tracking-normal">
-            &ldquo;Together, we can turn compassion into action.&rdquo;
-          </p>
-        </div>
-
-        {/* 3. App Name (Relief in white, Link in teal) */}
-        <div
-          className={cn(
-            'mt-4 transition-all duration-700 ease-out transform',
+            'transition-all duration-700 ease-out transform',
             showBrand
               ? 'opacity-100 translate-y-0'
               : 'opacity-0 translate-y-3',
           )}
         >
-          <h1 className="text-[28px] sm:text-[32px] font-bold tracking-tight flex items-center justify-center leading-none">
+          <h1 className="text-[32px] sm:text-[36px] font-bold tracking-tight flex items-center justify-center leading-tight">
             <span className="text-white">Relief</span>
             <span className="text-[#22D3C5]">Link</span>
           </h1>
         </div>
 
-        {/* 4. Tagline */}
+        {/* 3. One Caption Only */}
         <div
           className={cn(
-            'mt-2 transition-all duration-700 ease-out transform',
+            'mt-2.5 transition-all duration-700 ease-out transform',
             showTagline
               ? 'opacity-100 translate-y-0'
               : 'opacity-0 translate-y-3',
           )}
         >
-          <p className="text-[12px] sm:text-[13px] font-semibold text-[#FFBE55] tracking-widest uppercase">
+          <p className="text-[13px] sm:text-[14px] font-semibold text-[#FFBE55] tracking-widest uppercase">
             Connecting help. Delivering hope.
           </p>
         </div>

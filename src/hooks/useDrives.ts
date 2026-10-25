@@ -53,7 +53,9 @@ export async function fetchDrives(): Promise<CollectionDrive[]> {
         .order('departure_date', { ascending: true })
 
       if (!error && data) {
-        return data.map((d: any) => {
+        return data
+          .filter((d: any) => !d.title?.startsWith('Automated QA ') && !d.title?.startsWith('[TEST]'))
+          .map((d: any) => {
           const drive = { ...d } as CollectionDrive
           if (drive.allow_calls === false && (!currentUserId || currentUserId !== drive.collector_id)) {
             drive.organizer_contact = undefined
