@@ -84,6 +84,19 @@ export function DriveDetailPage() {
 
   // ── Contribute Modal State ──────────────────────────────────────────────────
   const [isContributeModalOpen, setIsContributeModalOpen] = useState(false)
+
+  // Lock body scroll when Contribute Modal is open
+  useEffect(() => {
+    if (isContributeModalOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = 'unset'
+    }
+    return () => {
+      document.body.style.overflow = 'unset'
+    }
+  }, [isContributeModalOpen])
+
   const [donorName, setDonorName] = useState('')
   const [donorContact, setDonorContact] = useState('')
   const [isAnonymous, setIsAnonymous] = useState(false)
@@ -151,25 +164,52 @@ export function DriveDetailPage() {
     // Initialize from drive target items
     if (drive?.target_items) {
       for (const item of drive.target_items) {
+        const pledgedVal = Number((item as any).pledged_quantity) || 0
+        const collectedVal = Number((item as any).collected_quantity) || 0
         map[item.name] = {
-          target: item.target_quantity,
+          target: Number(item.target_quantity) || 0,
           unit: item.unit || 'units',
-          pledged: 0,
-          accepted: 0,
-          collected: 0,
+          pledged: pledgedVal,
+          accepted: pledgedVal,
+          collected: collectedVal,
         }
       }
     }
 
-    // Accumulate from contributions
-    const activeContribs = contributions.filter(
-      c => c.status !== 'declined' && c.status !== 'cancelled'
+    // Accumulate from contributions (use organizer contributions if available, else public contributions)
+    const effectiveContribs = (contributions && contributions.length > 0)
+      ? contributions
+      : (publicContribs && publicContribs.length > 0)
+      ? (publicContribs as any[])
+      : []
+
+    console.log('[DriveDetailPage] Computing itemQuantities for drive:', drive?.id, {
+      target_items: drive?.target_items,
+      contributionsCount: contributions.length,
+      publicContribsCount: publicContribs.length,
+    })
+
+    const activeContribs = effectiveContribs.filter(
+      (c: any) => c.status !== 'declined' && c.status !== 'cancelled'
     )
 
+    // If activeContribs exist, reset before re-accumulating to avoid double counting
+    if (activeContribs.length > 0) {
+      for (const k of Object.keys(map)) {
+        map[k].pledged = 0
+        map[k].accepted = 0
+        map[k].collected = 0
+      }
+    }
+
     for (const contrib of activeContribs) {
-      for (const item of contrib.items) {
-        if (!map[item.item_name]) {
-          map[item.item_name] = {
+      const itemsList = contrib.items || (contrib as any).contribution_items || []
+      for (const item of itemsList) {
+        const itemName = item.item_name || item.name
+        if (!itemName) continue
+
+        if (!map[itemName]) {
+          map[itemName] = {
             target: 0,
             unit: item.unit || 'units',
             pledged: 0,
@@ -178,7 +218,8 @@ export function DriveDetailPage() {
           }
         }
 
-        map[item.item_name].pledged += item.quantity
+        const qty = Number(item.quantity) || 0
+        map[itemName].pledged += qty
 
         if (
           contrib.status === 'accepted' ||
@@ -188,7 +229,7 @@ export function DriveDetailPage() {
           contrib.status === 'delivered' ||
           contrib.status === 'receipt_confirmed'
         ) {
-          map[item.item_name].accepted += item.quantity
+          map[itemName].accepted += qty
         }
 
         if (
@@ -197,13 +238,13 @@ export function DriveDetailPage() {
           contrib.status === 'delivered' ||
           contrib.status === 'receipt_confirmed'
         ) {
-          map[item.item_name].collected += item.quantity
+          map[itemName].collected += qty
         }
       }
     }
 
     return map
-  }, [drive, contributions])
+  }, [drive, contributions, publicContribs])
 
   const totalCollectedUnits = useMemo(() => {
     return Object.values(itemQuantities).reduce((acc, curr) => acc + curr.collected, 0)
@@ -1177,7 +1218,7 @@ export function DriveDetailPage() {
             />
           </div>
 
-          <div className="flex items-center gap-2 pt-2">
+          <div className="flex items-center gap-2 pt-3 sticky bottom-0 bg-surface pb-1 border-t border-slate-100 mt-2 z-10 shadow-sm">
             <Button
               type="button"
               variant="secondary"

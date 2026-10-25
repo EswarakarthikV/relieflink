@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { MapPin, Clock, Users, AlertTriangle, ArrowLeft, Phone, PhoneOff, Lock, Shield } from 'lucide-react'
+import { MapPin, Clock, Users, AlertTriangle, ArrowLeft, Phone, PhoneOff, Lock, Shield, Layers } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
 import { TopBar } from '@/components/layout/TopBar'
 import { UrgencyBadge, StatusBadge } from '@/components/ui/Badge'
@@ -28,7 +28,9 @@ export function RequestDetailPage() {
 
   // Auto-open offer sheet if routed with ?action=donate or ?offer=true
   const shouldAutoOpenOffer = searchParams.get('action') === 'donate' || searchParams.get('offer') === 'true'
-  const [offerOpen, setOfferOpen] = useState(shouldAutoOpenOffer)
+  const [isOfferSheetOpen, setIsOfferSheetOpen] = useState(shouldAutoOpenOffer)
+  const offerOpen = isOfferSheetOpen
+  const setOfferOpen = setIsOfferSheetOpen
 
   if (isLoading) return (
     <AppShell>
@@ -58,6 +60,7 @@ export function RequestDetailPage() {
         category: s.category,
         quantity_needed: s.quantity_needed,
         quantity_committed: s.quantity_committed,
+        quantity_accepted: s.quantity_accepted ?? s.quantity_committed,
         quantity_delivered: s.quantity_delivered,
         quantity_remaining: s.quantity_remaining,
       }))
@@ -68,6 +71,7 @@ export function RequestDetailPage() {
         category: i.category,
         quantity_needed: i.quantityRequested,
         quantity_committed: i.quantityCommitted,
+        quantity_accepted: i.quantityCommitted,
         quantity_delivered: i.quantityDelivered,
         quantity_remaining: Math.max(0, i.quantityRequested - i.quantityCommitted),
       }))
@@ -264,17 +268,58 @@ export function RequestDetailPage() {
             )}
           </div>
 
-          {/* ── Items detail ─────────────────────────────────────────── */}
+          {/* ── Required Supplies & Fulfillment Table ───────────────────────── */}
           <div className="bg-surface rounded-card border border-slate-200/80 shadow-card p-4 space-y-3">
-            <h2 className="text-h4 font-semibold text-ink">Items Requested</h2>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-brand-600" />
+                <h2 className="text-body font-semibold text-navy-900">Required Supplies & Fulfillment</h2>
+              </div>
+              <span className="text-[11px] font-semibold text-ink-muted">
+                {displayItems.length} {displayItems.length === 1 ? 'item' : 'items'}
+              </span>
+            </div>
 
-            <div className="divide-y divide-slate-100">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-caption">
+                <thead>
+                  <tr className="border-b border-slate-200 text-ink-muted font-semibold text-[11px] uppercase tracking-wider">
+                    <th className="py-2 pr-2">Item</th>
+                    <th className="py-2 px-2 text-right">Target</th>
+                    <th className="py-2 px-2 text-right">Pledged</th>
+                    <th className="py-2 px-2 text-right">Accepted</th>
+                    <th className="py-2 pl-2 text-right">Collected</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-ink">
+                  {displayItems.map(item => (
+                    <tr key={item.id} className="hover:bg-slate-50/50">
+                      <td className="py-2.5 pr-2 font-medium text-navy-900">{item.name}</td>
+                      <td className="py-2.5 px-2 text-right text-ink-muted">
+                        {fmtNumber(item.quantity_needed)} {item.unit}
+                      </td>
+                      <td className="py-2.5 px-2 text-right text-ink font-medium">
+                        {fmtNumber(item.quantity_committed)}
+                      </td>
+                      <td className="py-2.5 px-2 text-right font-medium text-brand-600">
+                        {fmtNumber(item.quantity_accepted)}
+                      </td>
+                      <td className="py-2.5 pl-2 text-right font-bold text-success">
+                        {fmtNumber(item.quantity_delivered)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="divide-y divide-slate-100 pt-1">
               {displayItems.map(item => {
                 const pct = fmtPercent(item.quantity_committed, item.quantity_needed)
                 return (
-                  <div key={item.id} className="py-3 first:pt-0 last:pb-0 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-body font-medium text-ink">{item.name}</span>
+                  <div key={item.id} className="py-3 first:pt-2 last:pb-0 space-y-1.5">
+                    <div className="flex items-center justify-between text-[13px]">
+                      <span className="font-medium text-ink">{item.name}</span>
                       <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-brand-100 text-brand-600">{pct} met</span>
                     </div>
                     <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
@@ -283,11 +328,11 @@ export function RequestDetailPage() {
                         style={{ width: pct }}
                       />
                     </div>
-                    <div className="flex flex-wrap items-center justify-between gap-2 text-caption text-ink-muted tnum">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-ink-muted tnum">
                       <span>{fmtNumber(item.quantity_needed)} {item.unit} needed</span>
-                      <span>{fmtNumber(item.quantity_committed)} committed</span>
-                      <span>{fmtNumber(item.quantity_delivered)} delivered</span>
-                      <span>{fmtNumber(item.quantity_remaining)} remaining</span>
+                      <span>{fmtNumber(item.quantity_committed)} pledged</span>
+                      <span>{fmtNumber(item.quantity_accepted)} accepted</span>
+                      <span>{fmtNumber(item.quantity_delivered)} collected</span>
                     </div>
                   </div>
                 )
@@ -301,8 +346,8 @@ export function RequestDetailPage() {
               variant="primary"
               fullWidth
               size="lg"
-              onClick={() => setOfferOpen(true)}
-              disabled={req.status === 'fulfilled' || req.status === 'closed' || remaining <= 0}
+              onClick={() => setIsOfferSheetOpen(true)}
+              disabled={req.status === 'fulfilled' || req.status === 'closed'}
             >
               Make an Offer
             </Button>
@@ -317,7 +362,7 @@ export function RequestDetailPage() {
                 Track this request →
               </Button>
             )}
-            {remaining <= 0 && (
+            {remaining <= 0 && req.status === 'fulfilled' && (
               <p className="text-caption text-success text-center mt-2 font-medium">
                 ✓ This request is fully committed!
               </p>
@@ -330,8 +375,8 @@ export function RequestDetailPage() {
       {req && (
         <MakeOfferSheet
           request={updatedReq}
-          isOpen={offerOpen}
-          onClose={() => setOfferOpen(false)}
+          isOpen={isOfferSheetOpen}
+          onClose={() => setIsOfferSheetOpen(false)}
         />
       )}
     </>

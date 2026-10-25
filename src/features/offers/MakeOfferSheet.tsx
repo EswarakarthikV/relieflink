@@ -30,11 +30,30 @@ const DELIVERY_OPTIONS: { value: DeliveryMethod; label: string; sub: string }[] 
 export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps) {
   const { user } = useAuth()
   const createOffer = useCreateOffer()
-  const { data: stats = [], refetch: refetchStats } = useRequestItemStats(request.id)
+  const { data: stats = [], refetch: refetchStats } = useRequestItemStats(request?.id || '')
 
-  const [selectedItem, setSelectedItem] = useState<SupplyItem | undefined>(request.items[0])
+  // Lock body scroll when sheet is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = 'unset'
+    }
+    return () => {
+      document.body.style.overflow = 'unset'
+    }
+  }, [isOpen])
+
+  const [selectedItem, setSelectedItem] = useState<SupplyItem | undefined>(() => request?.items?.[0])
   const [overrideRemaining, setOverrideRemaining] = useState<Record<string, number>>({})
   const [isRefetchingStats, setIsRefetchingStats] = useState(false)
+
+  // Sync selectedItem if request.items loads after mount
+  useEffect(() => {
+    if (!selectedItem && request?.items && request.items.length > 0) {
+      setSelectedItem(request.items[0])
+    }
+  }, [request?.items, selectedItem])
 
   // Calculate fresh remaining quantity
   const selectedStat = selectedItem
@@ -46,7 +65,7 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
         ? overrideRemaining[selectedItem.id]
         : selectedStat !== undefined
         ? selectedStat.quantity_remaining
-        : Math.max(0, selectedItem.quantityRequested - selectedItem.quantityCommitted))
+        : Math.max(0, (selectedItem.quantityRequested ?? 0) - (selectedItem.quantityCommitted ?? 0)))
     : 100
 
   const maxQty = Math.max(0, baseRemaining)
@@ -103,7 +122,7 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
       prevIsOpenRef.current = true
       userEnteredQtyRef.current = false
       setIsRefetchingStats(true)
-      const first = request.items[0]
+      const first = request?.items?.[0]
       setSelectedItem(first)
       setDelivery('self')
       setMessage('')
@@ -124,41 +143,45 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
       setToastMessage(null)
 
       // 1. FORCE REFETCH WHEN MODAL OPENS
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['request_item_stats'] }),
-        queryClient.invalidateQueries({ queryKey: ['request', request.id] }),
-      ])
-        .then(async () => {
-          const { data: freshStats } = await refetchStats()
-          // Only update selected item and default quantity if user has not already entered their own quantity!
-          if (!userEnteredQtyRef.current) {
-            const targetItem =
-              (freshStats &&
-                request.items.find(it => {
-                  const s = freshStats.find((st: any) => st.request_item_id === it.id)
-                  return s && s.quantity_remaining > 0
-                })) ||
-              request.items.find(it => (it.quantityRequested - it.quantityCommitted) > 0) ||
-              request.items[0]
+      if (request?.id) {
+        Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['request_item_stats'] }),
+          queryClient.invalidateQueries({ queryKey: ['request', request.id] }),
+        ])
+          .then(async () => {
+            const { data: freshStats } = await refetchStats()
+            // Only update selected item and default quantity if user has not already entered their own quantity!
+            if (!userEnteredQtyRef.current && request?.items) {
+              const targetItem =
+                (freshStats &&
+                  request.items.find(it => {
+                    const s = freshStats.find((st: any) => st.request_item_id === it.id)
+                    return s && s.quantity_remaining > 0
+                  })) ||
+                request.items.find(it => ((it.quantityRequested ?? 0) - (it.quantityCommitted ?? 0)) > 0) ||
+                request.items[0]
 
-            if (targetItem) {
-              setSelectedItem(targetItem)
-              const stat = freshStats?.find((s: any) => s.request_item_id === targetItem.id)
-              const freshMax = stat
-                ? stat.quantity_remaining
-                : Math.max(0, targetItem.quantityRequested - targetItem.quantityCommitted)
-              setQty(freshMax > 0 ? Math.min(20, freshMax) : 0)
+              if (targetItem) {
+                setSelectedItem(targetItem)
+                const stat = freshStats?.find((s: any) => s.request_item_id === targetItem.id)
+                const freshMax = stat
+                  ? stat.quantity_remaining
+                  : Math.max(0, (targetItem.quantityRequested ?? 0) - (targetItem.quantityCommitted ?? 0))
+                setQty(freshMax > 0 ? Math.min(20, freshMax) : 0)
+              }
             }
-          }
-        })
-        .finally(() => {
-          setIsRefetchingStats(false)
-        })
+          })
+          .finally(() => {
+            setIsRefetchingStats(false)
+          })
+      } else {
+        setIsRefetchingStats(false)
+      }
     } else if (!isOpen) {
       prevIsOpenRef.current = false
       userEnteredQtyRef.current = false
     }
-  }, [isOpen, request.id, refetchStats, request.items])
+  }, [isOpen, request?.id, refetchStats, request?.items])
 
   const handleSelectItem = (item: SupplyItem) => {
     setSelectedItem(item)
@@ -393,10 +416,10 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
     }
   }
 
-  if (!isOpen) return null
+  if (!isOpen || !request) return null
 
-  const committed = selectedStat ? selectedStat.quantity_committed : selectedItem?.quantityCommitted || 0
-  const requested = selectedStat ? selectedStat.quantity_needed : selectedItem?.quantityRequested || 0
+  const committed = selectedStat ? selectedStat.quantity_committed : (selectedItem?.quantityCommitted ?? 0)
+  const requested = selectedStat ? selectedStat.quantity_needed : (selectedItem?.quantityRequested ?? 0)
   const ratio = requested > 0 ? fulfillmentRatio(committed, requested) : 0
 
   return (
@@ -433,7 +456,7 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
                 <p className="text-body text-ink leading-relaxed">
                   Your commitment of{' '}
                   <strong className="text-brand-600 font-bold">
-                    {fmtNumber(submittedOffer?.quantity ?? qty)} {submittedOffer?.unit ?? selectedItem?.unit}
+                    {fmtNumber(submittedOffer?.quantity ?? qty)} {submittedOffer?.unit ?? selectedItem?.unit ?? 'units'}
                   </strong>{' '}
                   has been recorded.
                 </p>
@@ -473,7 +496,7 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
                 <div>
                   <h1 className="text-h2 font-semibold text-ink tracking-tight">Offer supplies</h1>
                   <p className="text-caption text-ink-muted mt-0.5">
-                    {selectedItem?.name} · {request.refNumber}
+                    {selectedItem?.name || 'Supply item'} · {request?.refNumber || ''}
                   </p>
                 </div>
                 <button
@@ -494,7 +517,7 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
               )}
 
               {/* ── 1. Item Selector ───────────────────────────────── */}
-              {request.items && request.items.length > 0 && (
+              {request?.items && request.items.length > 0 && (
                 <div className="flex flex-col gap-2">
                   <label className="text-caption font-semibold text-ink">
                     Select item to provide
@@ -509,7 +532,7 @@ export function MakeOfferSheet({ request, isOpen, onClose }: MakeOfferSheetProps
                           ? overrideRemaining[item.id]
                           : itemStat !== undefined
                           ? itemStat.quantity_remaining
-                          : item.quantityRequested - item.quantityCommitted,
+                          : (item.quantityRequested ?? 0) - (item.quantityCommitted ?? 0),
                       )
                       return (
                         <Card

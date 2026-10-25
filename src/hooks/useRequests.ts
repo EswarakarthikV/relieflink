@@ -14,6 +14,7 @@ export interface RequestItemStat {
   category: string
   quantity_needed: number
   quantity_committed: number
+  quantity_accepted?: number
   quantity_delivered: number
   quantity_remaining: number
 }
@@ -217,22 +218,85 @@ export function useRequestItemStats(requestId: string) {
 
         const { data, error } = await query
 
-        if (error) {
-          console.warn('Error fetching request_item_stats:', error)
+        console.log('[useRequestItemStats] Database result for requestId:', requestId, { data, error })
+
+        // Live offers aggregation to guarantee live numbers even before stats view refreshes
+        const { data: offersData, error: offersError } = await supabase
+          .from('offers')
+          .select('request_item_id, quantity_offered, quantity_accepted, quantity_delivered, status')
+          .eq('request_id', requestId)
+
+        if (offersError) {
+          console.warn('[useRequestItemStats] Error fetching offers:', offersError)
+        } else {
+          console.log('[useRequestItemStats] Live offers for requestId:', requestId, offersData)
+        }
+
+        const offersByItem = new Map<string, { pledged: number; accepted: number; delivered: number }>()
+        if (offersData && offersData.length > 0) {
+          for (const off of offersData) {
+            if (off.status === 'rejected' || off.status === 'cancelled') continue
+            const current = offersByItem.get(off.request_item_id) || { pledged: 0, accepted: 0, delivered: 0 }
+            const offered = Number(off.quantity_offered) || 0
+            const accepted = off.quantity_accepted != null ? Number(off.quantity_accepted) : offered
+            const delivered = Number(off.quantity_delivered) || 0
+            offersByItem.set(off.request_item_id, {
+              pledged: current.pledged + offered,
+              accepted: current.accepted + accepted,
+              delivered: current.delivered + delivered,
+            })
+          }
+        }
+
+        if (error || !data || data.length === 0) {
+          // Fallback to request_items directly
+          const { data: itemsData } = await supabase
+            .from('request_items')
+            .select('*')
+            .eq('request_id', requestId)
+
+          if (itemsData && itemsData.length > 0) {
+            return itemsData.map((item: any) => {
+              const off = offersByItem.get(item.id) || { pledged: 0, accepted: 0, delivered: 0 }
+              const needed = Number(item.quantity_needed) || 0
+              return {
+                request_item_id: item.id,
+                request_id: item.request_id,
+                item_name: item.item_name,
+                unit: item.unit || 'units',
+                category: item.category || 'general',
+                quantity_needed: needed,
+                quantity_committed: off.pledged,
+                quantity_accepted: off.accepted,
+                quantity_delivered: off.delivered,
+                quantity_remaining: Math.max(0, needed - off.pledged),
+              }
+            })
+          }
           return []
         }
 
-        return (data || []).map((row: any) => ({
-          request_item_id: row.request_item_id,
-          request_id: row.request_id,
-          item_name: row.item_name,
-          unit: row.unit,
-          category: row.category,
-          quantity_needed: Number(row.quantity_needed) || 0,
-          quantity_committed: Number(row.quantity_committed) || 0,
-          quantity_delivered: Number(row.quantity_delivered) || 0,
-          quantity_remaining: Number(row.quantity_remaining) || 0,
-        }))
+        return (data || []).map((row: any) => {
+          const off = offersByItem.get(row.request_item_id)
+          const needed = Number(row.quantity_needed) || 0
+          const pledged = off ? Math.max(off.pledged, Number(row.quantity_committed) || 0) : (Number(row.quantity_committed) || 0)
+          const accepted = off ? Math.max(off.accepted, Number(row.quantity_accepted) || pledged) : (row.quantity_accepted != null ? Number(row.quantity_accepted) : pledged)
+          const delivered = off ? Math.max(off.delivered, Number(row.quantity_delivered) || 0) : (Number(row.quantity_delivered) || 0)
+          const remaining = Math.max(0, needed - pledged)
+
+          return {
+            request_item_id: row.request_item_id,
+            request_id: row.request_id,
+            item_name: row.item_name,
+            unit: row.unit,
+            category: row.category,
+            quantity_needed: needed,
+            quantity_committed: pledged,
+            quantity_accepted: accepted,
+            quantity_delivered: delivered,
+            quantity_remaining: remaining,
+          }
+        })
       } catch (err) {
         console.warn('Error in useRequestItemStats queryFn:', err)
         return []

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -15,6 +15,7 @@ import {
   PhoneOff,
   Info,
   Sparkles,
+  Layers,
 } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
 import { TopBar } from '@/components/layout/TopBar'
@@ -481,6 +482,60 @@ export function TrackerPage() {
 
   const isUserActualRequester = Boolean(user?.id && req.requesterId && user.id === req.requesterId)
 
+  const fulfillmentTableItems = useMemo(() => {
+    if (stats && stats.length > 0) {
+      return stats.map(s => {
+        const itemOffers = offers.filter(
+          o => o.item_name?.toLowerCase() === s.item_name?.toLowerCase() || (o as any).request_item_id === s.request_item_id
+        )
+        const activeOffers = itemOffers.filter(o => o.status !== 'rejected' && o.status !== 'cancelled')
+        const sumPledged = activeOffers.length > 0
+          ? activeOffers.reduce((sum, o) => sum + (Number(o.quantity_offered) || 0), 0)
+          : s.quantity_committed
+        const sumAccepted = activeOffers.length > 0
+          ? activeOffers.filter(o => o.status !== 'pending')
+              .reduce((sum, o) => sum + (Number(o.quantity_accepted ?? o.quantity_offered) || 0), 0)
+          : (s.quantity_accepted ?? s.quantity_committed)
+        const sumCollected = activeOffers.length > 0
+          ? activeOffers.filter(o => o.status === 'delivered')
+              .reduce((sum, o) => sum + (Number(o.quantity_delivered ?? o.quantity_offered) || 0), 0)
+          : s.quantity_delivered
+
+        return {
+          id: s.request_item_id,
+          name: s.item_name,
+          unit: s.unit,
+          target: s.quantity_needed,
+          pledged: Math.max(sumPledged, s.quantity_committed),
+          accepted: Math.max(sumAccepted, s.quantity_accepted ?? s.quantity_committed),
+          collected: Math.max(sumCollected, s.quantity_delivered),
+        }
+      })
+    }
+
+    return (req?.items || []).map(i => {
+      const itemOffers = offers.filter(
+        o => o.item_name?.toLowerCase() === i.name.toLowerCase() || (o as any).request_item_id === i.id
+      )
+      const activeOffers = itemOffers.filter(o => o.status !== 'rejected' && o.status !== 'cancelled')
+      const sumPledged = activeOffers.reduce((sum, o) => sum + (Number(o.quantity_offered) || 0), 0)
+      const sumAccepted = activeOffers.filter(o => o.status !== 'pending')
+        .reduce((sum, o) => sum + (Number(o.quantity_accepted ?? o.quantity_offered) || 0), 0)
+      const sumCollected = activeOffers.filter(o => o.status === 'delivered')
+        .reduce((sum, o) => sum + (Number(o.quantity_delivered ?? o.quantity_offered) || 0), 0)
+
+      return {
+        id: i.id,
+        name: i.name,
+        unit: i.unit,
+        target: i.quantityRequested,
+        pledged: sumPledged || i.quantityCommitted,
+        accepted: sumAccepted || i.quantityCommitted,
+        collected: sumCollected || i.quantityDelivered,
+      }
+    })
+  }, [stats, offers, req?.items])
+
   return (
     <AppShell>
       <TopBar title={`${req.refNumber} Tracker`} showBack variant="navy" />
@@ -581,6 +636,54 @@ export function TrackerPage() {
               <span className="text-ink"><strong className="font-semibold">{fmtNumber(remaining)}</strong> Remaining</span>
             </div>
           </div>
+
+          {/* ── Required Supplies & Fulfillment Table ── */}
+          {fulfillmentTableItems.length > 0 && (
+            <div className="pt-3 border-t border-slate-100 space-y-2">
+              <div className="flex items-center justify-between pb-1">
+                <div className="flex items-center gap-1.5">
+                  <Layers className="w-4 h-4 text-brand-600" />
+                  <h3 className="text-[13px] font-semibold text-navy-900">Required Supplies & Fulfillment</h3>
+                </div>
+                <span className="text-[11px] font-semibold text-ink-muted">
+                  {fulfillmentTableItems.length} {fulfillmentTableItems.length === 1 ? 'item' : 'items'}
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-caption">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-ink-muted font-semibold text-[11px] uppercase tracking-wider">
+                      <th className="py-2 pr-2">Item</th>
+                      <th className="py-2 px-2 text-right">Target</th>
+                      <th className="py-2 px-2 text-right">Pledged</th>
+                      <th className="py-2 px-2 text-right">Accepted</th>
+                      <th className="py-2 pl-2 text-right">Collected</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-ink">
+                    {fulfillmentTableItems.map(item => (
+                      <tr key={item.id} className="hover:bg-slate-50/50">
+                        <td className="py-2 pr-2 font-medium text-navy-900">{item.name}</td>
+                        <td className="py-2 px-2 text-right text-ink-muted">
+                          {fmtNumber(item.target)} {item.unit}
+                        </td>
+                        <td className="py-2 px-2 text-right text-ink font-medium">
+                          {fmtNumber(item.pledged)}
+                        </td>
+                        <td className="py-2 px-2 text-right font-medium text-brand-600">
+                          {fmtNumber(item.accepted)}
+                        </td>
+                        <td className="py-2 pl-2 text-right font-bold text-success">
+                          {fmtNumber(item.collected)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ── Suggested Matches (Private to Request Owner / Requester View) ── */}

@@ -10,6 +10,7 @@ export interface TrackerOffer {
   item_name: string
   unit: string
   quantity_offered: number
+  quantity_accepted?: number
   quantity_dispatched: number
   quantity_delivered: number
   status: 'pending' | 'accepted' | 'dispatched' | 'delivered' | 'cancelled' | 'rejected'
